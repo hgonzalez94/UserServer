@@ -21,6 +21,28 @@ import (
 
 //	"appengine"
 //	"appengine/datastore"
+	"encoding/json"
+)
+
+const (
+	AccountErrorFetch	= "Error fetching account"
+	AccountErrorSave	= "Error saving new account"
+	AccountSuccessFetch	= "successfully fetched current account"
+
+	UserErrorFetch		= "Error fetching user"
+	UserErrorSave		= "Error saving new user"
+	UserSuccessFetch	= "successfully fetched user"
+
+	NewUserRegSuccess	= "successfully registered user"
+	NewUserRegError		= "error registering user"
+
+	NewRecipeSuccess	= "successfully created new recipe"
+	NewRecipeError		= "error creating new recipe"
+	RecipeFormError		= "error creating recipe from form data"
+
+	NewTagSuccess		= "successfully created new tag"
+	NewTagError			= "error creating new tag"
+	TagFormError		= "error creating tag from form data"
 )
 
 var (
@@ -209,4 +231,18 @@ func getDatastoreKind(kind reflect.Type) (dsKind string) {
 		dsKind = dsKind[li+1:]
 	}
 	return
+}
+
+// Json Encoded Errors
+func ServerResponse(code int, msg string, result interface{}, data *utils.ApiResponse, out *json.Encoder) {
+	data.Code = code
+	data.Message = msg
+	data.Result = result
+	out.Encode(data)
+}
+
+func ServerError(code int, msg string, data *utils.ApiResponse, out *json.Encoder) {
+	data.Code = code
+	data.Message = msg
+	out.Encode(data)
 }

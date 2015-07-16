@@ -22,6 +22,7 @@
       <root url="file://$PROJECT_DIR$/../github.com/gorilla/mux/.git" />
       <root url="file://$PROJECT_DIR$/../golang.org/x/net/.git" />
       <root url="file://$PROJECT_DIR$/../golang.org/x/net/html/charset/testdata" />
+      <root url="file://$PROJECT_DIR$/../github.com/pborman/uuid/.git" />
       <root url="file://$PROJECT_DIR$/../github.com/gorilla/sessions/.git" />
       <root url="file://$PROJECT_DIR$/../github.com/golang/protobuf/proto/testdata" />
       <root url="file://$PROJECT_DIR$/../github.com/golang/protobuf/.git" />
@@ -32,11 +33,12 @@
       <root url="file://$PROJECT_DIR$/../github.com/qedus/nds/.git" />
       <root url="file://$PROJECT_DIR$/../google.golang.org/cloud/storage/testdata" />
       <root url="file://$PROJECT_DIR$/../github.com/gorilla/securecookie/.git" />
-      <root url="file://$PROJECT_DIR$/../github.com/paceline/goauth2/.git" />
       <root url="file://$PROJECT_DIR$" />
+      <root url="file://$PROJECT_DIR$/../github.com/paceline/goauth2/.git" />
       <root url="file://$PROJECT_DIR$/../google.golang.org/appengine/.git" />
       <root url="file://$PROJECT_DIR$/../code.google.com/p/go-uuid/.hg" />
       <root url="file://$PROJECT_DIR$/../golang.org/x/oauth2/.git" />
+      <root url="file://$PROJECT_DIR$/../github.com/RangelReale/osin/.git" />
     </excluded>
   </library>
 </component>
