@@ -32,10 +32,12 @@ func init() {
 
 	// OAuth2 Handling
 
-	cfg := osin.NewServerConfig()
-	cfg.AllowGetAccessRequest = true
-	cfg.AllowClientSecretInParams = true
-	server := osin.NewServer(cfg, NewStorage())
+	sconfig := osin.NewServerConfig()
+	sconfig.AllowedAuthorizeTypes = osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
+	sconfig.AllowedAccessTypes = osin.AllowedAccessType{osin.AUTHORIZATION_CODE,
+		osin.REFRESH_TOKEN, osin.PASSWORD, osin.CLIENT_CREDENTIALS, osin.ASSERTION}
+	sconfig.AllowGetAccessRequest = true
+	server := osin.NewServer(sconfig, NewStorage())
 
 	router.HandleFunc("/authorize", func(w http.ResponseWriter, r *http.Request) {
 		resp := server.NewResponse()
@@ -45,29 +47,53 @@ func init() {
 			if !example.HandleLoginPage(ar, w, r) {
 				return
 			}
+			ar.UserData = struct{ Login string }{Login: "test"}
 			ar.Authorized = true
 			server.FinishAuthorizeRequest(resp, r, ar)
 		}
 		if resp.IsError && resp.InternalError != nil {
 			fmt.Printf("ERROR: %s\n", resp.InternalError)
 		}
+		if !resp.IsError {
+			resp.Output["custom_parameter"] = 187723
+		}
 		osin.OutputJSON(resp, w, r)
 	})
 
+	// Access token endpoint
 	router.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 		resp := server.NewResponse()
 		defer resp.Close()
 
 		if ar := server.HandleAccessRequest(resp, r); ar != nil {
-			ar.Authorized = true
+			switch ar.Type {
+			case osin.AUTHORIZATION_CODE:
+				ar.Authorized = true
+			case osin.REFRESH_TOKEN:
+				ar.Authorized = true
+			case osin.PASSWORD:
+				if ar.Username == "test" && ar.Password == "test" {
+					ar.Authorized = true
+				}
+			case osin.CLIENT_CREDENTIALS:
+				ar.Authorized = true
+			case osin.ASSERTION:
+				if ar.AssertionType == "urn:osin.example.complete" && ar.Assertion == "osin.data" {
+					ar.Authorized = true
+				}
+			}
 			server.FinishAccessRequest(resp, r, ar)
 		}
 		if resp.IsError && resp.InternalError != nil {
 			fmt.Printf("ERROR: %s\n", resp.InternalError)
 		}
+		if !resp.IsError {
+			resp.Output["custom_parameter"] = 19923
+		}
 		osin.OutputJSON(resp, w, r)
 	})
 
+	// Information endpoint
 	router.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
 		resp := server.NewResponse()
 		defer resp.Close()
@@ -78,12 +104,20 @@ func init() {
 		osin.OutputJSON(resp, w, r)
 	})
 
+	// Application home endpoint
 	router.HandleFunc("/app", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("<html><body>"))
-		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=code&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Login</a><br/>", url.QueryEscape("http://localhost:8080/appauth/code"))))
+
+		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=code&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Code</a><br/>", url.QueryEscape("http://localhost:8080/appauth/code"))))
+		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=token&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Implict</a><br/>", url.QueryEscape("http://localhost:8080/appauth/token"))))
+		w.Write([]byte(fmt.Sprintf("<a href=\"/appauth/password\">Password</a><br/>")))
+		w.Write([]byte(fmt.Sprintf("<a href=\"/appauth/client_credentials\">Client Credentials</a><br/>")))
+		w.Write([]byte(fmt.Sprintf("<a href=\"/appauth/assertion\">Assertion</a><br/>")))
+
 		w.Write([]byte("</body></html>"))
 	})
 
+	// Application destination - CODE
 	router.HandleFunc("/appauth/code", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -101,7 +135,7 @@ func init() {
 		jr := make(map[string]interface{})
 
 		// build access code url
-		aurl := fmt.Sprintf("/token?grant_type=authorization_code&client_id=1234&client_secret=aabbccdd&state=xyz&redirect_uri=%s&code=%s",
+		aurl := fmt.Sprintf("/token?grant_type=authorization_code&client_id=1234&state=xyz&redirect_uri=%s&code=%s",
 			url.QueryEscape("http://localhost:8080/appauth/code"), url.QueryEscape(code))
 
 		// if parse, download and parse json
@@ -134,6 +168,261 @@ func init() {
 		curq.Add("doparse", "1")
 		cururl.RawQuery = curq.Encode()
 		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Download Token</a><br/>", cururl.String())))
+
+		if rt, ok := jr["refresh_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/refresh?code=%s", rt)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Refresh Token</a><br/>", rurl)))
+		}
+
+		if at, ok := jr["access_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/info?code=%s", at)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Info</a><br/>", rurl)))
+		}
+	})
+
+	// Application destination - TOKEN
+	router.HandleFunc("/appauth/token", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		w.Write([]byte("<html><body>"))
+		w.Write([]byte("APP AUTH - TOKEN<br/>"))
+
+		w.Write([]byte("Response data in fragment - not acessible via server - Nothing to do"))
+
+		w.Write([]byte("</body></html>"))
+	})
+
+	// Application destination - PASSWORD
+	router.HandleFunc("/appauth/password", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		w.Write([]byte("<html><body>"))
+		w.Write([]byte("APP AUTH - PASSWORD<br/>"))
+
+		jr := make(map[string]interface{})
+
+		// build access code url
+		aurl := fmt.Sprintf("/token?grant_type=password&scope=everything&username=%s&password=%s",
+			"test", "test")
+
+		// download token
+		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			w.Write([]byte("<br/>"))
+		}
+
+		// show json error
+		if erd, ok := jr["error"]; ok {
+			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
+		}
+
+		// show json access token
+		if at, ok := jr["access_token"]; ok {
+			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s<br/>\n", at)))
+		}
+
+		w.Write([]byte(fmt.Sprintf("FULL RESULT: %+v<br/>\n", jr)))
+
+		if rt, ok := jr["refresh_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/refresh?code=%s", rt)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Refresh Token</a><br/>", rurl)))
+		}
+
+		if at, ok := jr["access_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/info?code=%s", at)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Info</a><br/>", rurl)))
+		}
+
+		w.Write([]byte("</body></html>"))
+	})
+
+	// Application destination - CLIENT_CREDENTIALS
+	router.HandleFunc("/appauth/client_credentials", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		w.Write([]byte("<html><body>"))
+		w.Write([]byte("APP AUTH - CLIENT CREDENTIALS<br/>"))
+
+		jr := make(map[string]interface{})
+
+		// build access code url
+		aurl := fmt.Sprintf("/token?grant_type=client_credentials")
+
+		// download token
+		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			w.Write([]byte("<br/>"))
+		}
+
+		// show json error
+		if erd, ok := jr["error"]; ok {
+			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
+		}
+
+		// show json access token
+		if at, ok := jr["access_token"]; ok {
+			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s<br/>\n", at)))
+		}
+
+		w.Write([]byte(fmt.Sprintf("FULL RESULT: %+v<br/>\n", jr)))
+
+		if rt, ok := jr["refresh_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/refresh?code=%s", rt)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Refresh Token</a><br/>", rurl)))
+		}
+
+		if at, ok := jr["access_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/info?code=%s", at)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Info</a><br/>", rurl)))
+		}
+
+		w.Write([]byte("</body></html>"))
+	})
+
+	// Application destination - ASSERTION
+	router.HandleFunc("/appauth/assertion", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		w.Write([]byte("<html><body>"))
+		w.Write([]byte("APP AUTH - ASSERTION<br/>"))
+
+		jr := make(map[string]interface{})
+
+		// build access code url
+		aurl := fmt.Sprintf("/token?grant_type=assertion&assertion_type=urn:osin.example.complete&assertion=osin.data")
+
+		// download token
+		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			w.Write([]byte("<br/>"))
+		}
+
+		// show json error
+		if erd, ok := jr["error"]; ok {
+			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
+		}
+
+		// show json access token
+		if at, ok := jr["access_token"]; ok {
+			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s<br/>\n", at)))
+		}
+
+		w.Write([]byte(fmt.Sprintf("FULL RESULT: %+v<br/>\n", jr)))
+
+		if rt, ok := jr["refresh_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/refresh?code=%s", rt)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Refresh Token</a><br/>", rurl)))
+		}
+
+		if at, ok := jr["access_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/info?code=%s", at)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Info</a><br/>", rurl)))
+		}
+
+		w.Write([]byte("</body></html>"))
+	})
+
+	// Application destination - REFRESH
+	router.HandleFunc("/appauth/refresh", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		w.Write([]byte("<html><body>"))
+		w.Write([]byte("APP AUTH - REFRESH<br/>"))
+		defer w.Write([]byte("</body></html>"))
+
+		code := r.Form.Get("code")
+
+		if code == "" {
+			w.Write([]byte("Nothing to do"))
+			return
+		}
+
+		jr := make(map[string]interface{})
+
+		// build access code url
+		aurl := fmt.Sprintf("/token?grant_type=refresh_token&refresh_token=%s", url.QueryEscape(code))
+
+		// download token
+		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			w.Write([]byte("<br/>"))
+		}
+
+		// show json error
+		if erd, ok := jr["error"]; ok {
+			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
+		}
+
+		// show json access token
+		if at, ok := jr["access_token"]; ok {
+			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s<br/>\n", at)))
+		}
+
+		w.Write([]byte(fmt.Sprintf("FULL RESULT: %+v<br/>\n", jr)))
+
+		if rt, ok := jr["refresh_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/refresh?code=%s", rt)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Refresh Token</a><br/>", rurl)))
+		}
+
+		if at, ok := jr["access_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/info?code=%s", at)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Info</a><br/>", rurl)))
+		}
+	})
+
+	// Application destination - INFO
+	router.HandleFunc("/appauth/info", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		w.Write([]byte("<html><body>"))
+		w.Write([]byte("APP AUTH - INFO<br/>"))
+		defer w.Write([]byte("</body></html>"))
+
+		code := r.Form.Get("code")
+
+		if code == "" {
+			w.Write([]byte("Nothing to do"))
+			return
+		}
+
+		jr := make(map[string]interface{})
+
+		// build access code url
+		aurl := fmt.Sprintf("/info?code=%s", url.QueryEscape(code))
+
+		// download token
+		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			w.Write([]byte("<br/>"))
+		}
+
+		// show json error
+		if erd, ok := jr["error"]; ok {
+			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
+		}
+
+		// show json access token
+		if at, ok := jr["access_token"]; ok {
+			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s<br/>\n", at)))
+		}
+
+		w.Write([]byte(fmt.Sprintf("FULL RESULT: %+v<br/>\n", jr)))
+
+		if rt, ok := jr["refresh_token"]; ok {
+			rurl := fmt.Sprintf("/appauth/refresh?code=%s", rt)
+			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Refresh Token</a><br/>", rurl)))
+		}
 	})
 
 	// Initialize Handlers
@@ -141,14 +430,14 @@ func init() {
 
 	router.HandleFunc("/users.json", UsersHandler)
 	router.HandleFunc("/users/new.json", NewUserRegistration).
-			Methods("POST", "GET").
-			Name("CreateAccount")
+	Methods("POST", "GET").
+	Name("CreateAccount")
 	router.HandleFunc("/users/authenticate.json", Authenticate).
-			Methods("POST", "GET").
-			Name("Authenticate")
+	Methods("POST", "GET").
+	Name("Authenticate")
 	router.HandleFunc("/users/current.json", VerificationHandler).
-			Methods("POST", "GET").
-			Name("VerifyEntry")
+	Methods("POST", "GET").
+	Name("VerifyEntry")
 
 	router.HandleFunc("/accounts.json", AccountsHandler)
 	router.HandleFunc("/accounts/authenticate.json", AuthenticateHandler).
@@ -158,8 +447,8 @@ func init() {
 	// Recipes
 	router.HandleFunc("/recipes.json", RecipesHandler)
 	router.HandleFunc("/recipes/new.json", CreateNewRecipe).
-			Methods("POST", "GET").
-			Name("CreateRecipe")
+	Methods("POST", "GET").
+	Name("CreateRecipe")
 
 	// Tags
 	router.HandleFunc("/tags.json", TagsHandler)
@@ -225,8 +514,8 @@ func VerificationHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ServerResponse(202, UserSuccessFetch, currentAccount, response, out)
 		// test slice
-//		slices := []Account{currentAccount}
-//		response.Result = slices
+		//		slices := []Account{currentAccount}
+		//		response.Result = slices
 	}
 }
 
@@ -374,37 +663,37 @@ func NewUserRegistration(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-//	acct := &Account{}
-//	name := r.FormValue("account")
-//	if name != "" {
-//		acct = &Account{
-//			Name:   name,
-//			Active: true,
-//		}
-//	} else {
-//		dec := json.NewDecoder(r.Body)
-//		defer r.Body.Close()
-//		err := dec.Decode(acct)
-//		if err != nil {
-//			if err == io.EOF {
-//				response.Code = http.StatusBadRequest
-//				response.Message = "Account name must be provided"
-//			} else {
-//				response.Code = http.StatusInternalServerError
-//				response.Message = err.Error()
-//			}
-//			out.Encode(response)
-//			return
-//		}
-//	}
-//	_, aerr := Save(ctx, acct)
-//	if aerr != nil {
-//		ServerError(http.StatusInternalServerError, AccountErrorSave, response, out)
-//		return
-//	}
-//	response.Code = 200
-//	response.Result = acct
-//	out.Encode(response)
+	//	acct := &Account{}
+	//	name := r.FormValue("account")
+	//	if name != "" {
+	//		acct = &Account{
+	//			Name:   name,
+	//			Active: true,
+	//		}
+	//	} else {
+	//		dec := json.NewDecoder(r.Body)
+	//		defer r.Body.Close()
+	//		err := dec.Decode(acct)
+	//		if err != nil {
+	//			if err == io.EOF {
+	//				response.Code = http.StatusBadRequest
+	//				response.Message = "Account name must be provided"
+	//			} else {
+	//				response.Code = http.StatusInternalServerError
+	//				response.Message = err.Error()
+	//			}
+	//			out.Encode(response)
+	//			return
+	//		}
+	//	}
+	//	_, aerr := Save(ctx, acct)
+	//	if aerr != nil {
+	//		ServerError(http.StatusInternalServerError, AccountErrorSave, response, out)
+	//		return
+	//	}
+	//	response.Code = 200
+	//	response.Result = acct
+	//	out.Encode(response)
 }
 
 func RecipesHandler(w http.ResponseWriter, r *http.Request) {
@@ -419,13 +708,13 @@ func RecipesHandler(w http.ResponseWriter, r *http.Request) {
 		response.Code = 420
 		response.Message = "dale got all recipes"
 		response.Result = recipes
-//		data := make(map[string]interface{})
-//		for idx := range recipes {
-//			recipe := recipes[idx]
-//			key := strconv.Itoa(idx)
-//			data[key] = recipe
-//		}
-//		response.Data = data
+		//		data := make(map[string]interface{})
+		//		for idx := range recipes {
+		//			recipe := recipes[idx]
+		//			key := strconv.Itoa(idx)
+		//			data[key] = recipe
+		//		}
+		//		response.Data = data
 	}
 	out.Encode(response)
 }
