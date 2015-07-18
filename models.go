@@ -88,6 +88,7 @@ type User struct {
 	EncryptedPassword	[]byte                `json:"-"`
 	FirstName			string                `json:"firstName"`
 	LastName			string                `json:"lastName"`
+	AccessToken			string					`json:"-"`
 	AccountKey        	*newdatastore.Key        `json:"-"`
 	account           	*Account
 
@@ -147,7 +148,7 @@ func NewStorage() *Storage {
 	r.clients["1234"] = &osin.DefaultClient{
 		Id:          "1234",
 		Secret:      "aabbccdd",
-		RedirectUri: "http://localhost:8080/appauth",
+		RedirectUri: "http://localhost:8080/appauth", //define redirectURI here
 	}
 
 	return r

@@ -14,6 +14,8 @@ import (
 	"github.com/RangelReale/osin"
 	"github.com/RangelReale/osin/example"
 	"net/url"
+//	newurlfetch "google.golang.org/appengine/urlfetch"
+//	"io/ioutil"
 )
 
 // Global vars
@@ -54,7 +56,7 @@ func init() {
 		osin.OutputJSON(resp, w, r)
 	})
 
-	router.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/token.json", func(w http.ResponseWriter, r *http.Request) {
 		resp := server.NewResponse()
 		defer resp.Close()
 
@@ -80,7 +82,7 @@ func init() {
 
 	router.HandleFunc("/app", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("<html><body>"))
-		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=code&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Login</a><br/>", url.QueryEscape("http://localhost:8080/appauth/code"))))
+		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=code&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Login</a><br/>", url.QueryEscape("http://localhost:8080/appauth/code")))) //URI must be registered
 		w.Write([]byte("</body></html>"))
 	})
 
@@ -101,69 +103,88 @@ func init() {
 		jr := make(map[string]interface{})
 
 		// build access code url
-		aurl := fmt.Sprintf("/token?grant_type=authorization_code&client_id=1234&client_secret=aabbccdd&state=xyz&redirect_uri=%s&code=%s",
+		aurl := fmt.Sprintf("/token.json?grant_type=authorization_code&client_id=1234&client_secret=aabbccdd&state=xyz&redirect_uri=%s&code=%s",
 			url.QueryEscape("http://localhost:8080/appauth/code"), url.QueryEscape(code))
 
 		// if parse, download and parse json
-		if r.Form.Get("doparse") == "1" {
+//		if r.Form.Get("doparse") == "1" {
 			err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-				&osin.BasicAuth{"1234", "aabbccdd"}, jr)
+				&osin.BasicAuth{"1234", "aabbccdd"}, jr, r)
 			if err != nil {
 				w.Write([]byte(err.Error()))
 				w.Write([]byte("<br/>"))
 			}
-		}
+//		}
 
 		// show json error
-		if erd, ok := jr["error"]; ok {
-			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
-		}
+//		if erd, ok := jr["error"]; ok {
+////			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
+//		}
 
 		// show json access token
-		if at, ok := jr["access_token"]; ok {
-			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s<br/>\n", at)))
-		}
+//		if at, ok := jr["access_token"]; ok {
+////			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s%s<br/>\n", at)))
+//		}
 
-		w.Write([]byte(fmt.Sprintf("FULL RESULT: %+v<br/>\n", jr)))
+//		w.Write([]byte(fmt.Sprintf("FULL RESULT: %+v\n%s<br/>\n", jr, aurl)))
 
 		// output links
 		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Goto Token URL</a><br/>", aurl)))
+
+		out := json.NewEncoder(w)
+		response := &utils.ApiResponse{}
+		ServerResponse(200, "successful get request", jr, response, out)
 
 		cururl := *r.URL
 		curq := cururl.Query()
 		curq.Add("doparse", "1")
 		cururl.RawQuery = curq.Encode()
 		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Download Token</a><br/>", cururl.String())))
+
+//		ctx := newappengine.NewContext(r)
+//		client := newurlfetch.Client(ctx)
+//		resp, error := client.Get(fmt.Sprintf("http://localhost:8080%s", aurl))
+//		if error != nil {
+////			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">YOU FUCK UP</a><br/>", aurl)))
+//		} else {
+//			defer resp.Body.Close()
+//			data := map[string]interface{}{}
+//			body, _ := ioutil.ReadAll(resp.Body)
+//			json.Unmarshal(body, &data)
+//			out := json.NewEncoder(w)
+//			response := &utils.ApiResponse{}
+//			ServerResponse(200, "successful get request", data, response, out)
+//		}
 	})
 
 	// Initialize Handlers
-	router.HandleFunc("/", MainHandler)
+	router.HandleFunc("/appauth/", MainHandler)
 
-	router.HandleFunc("/users.json", UsersHandler)
-	router.HandleFunc("/users/new.json", NewUserRegistration).
+	router.HandleFunc("/appauth/users.json", UsersHandler)
+	router.HandleFunc("/appauth/users/new.json", NewUserRegistration).
 			Methods("POST", "GET").
 			Name("CreateAccount")
-	router.HandleFunc("/users/authenticate.json", Authenticate).
+	router.HandleFunc("/appauth/users/authenticate.json", Authenticate).
 			Methods("POST", "GET").
 			Name("Authenticate")
-	router.HandleFunc("/users/current.json", VerificationHandler).
+	router.HandleFunc("/appauth/users/current.json", VerificationHandler).
 			Methods("POST", "GET").
 			Name("VerifyEntry")
 
-	router.HandleFunc("/accounts.json", AccountsHandler)
-	router.HandleFunc("/accounts/authenticate.json", AuthenticateHandler).
+	router.HandleFunc("/appauth/accounts.json", AccountsHandler)
+	router.HandleFunc("/appauth/accounts/authenticate.json", AuthenticateHandler).
 	Methods("POST", "GET").
 	Name("Authenticate")
 
 	// Recipes
-	router.HandleFunc("/recipes.json", RecipesHandler)
-	router.HandleFunc("/recipes/new.json", CreateNewRecipe).
+	router.HandleFunc("/appauth/recipes.json", RecipesHandler)
+	router.HandleFunc("/appauth/recipes/new.json", CreateNewRecipe).
 			Methods("POST", "GET").
 			Name("CreateRecipe")
 
 	// Tags
-	router.HandleFunc("/tags.json", TagsHandler)
-	router.HandleFunc("/tags/new.json", CreateNewTag).
+	router.HandleFunc("/appauth/tags.json", TagsHandler)
+	router.HandleFunc("/appauth/tags/new.json", CreateNewTag).
 	Methods("POST", "GET").
 	Name("CreateTag")
 
@@ -374,37 +395,6 @@ func NewUserRegistration(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-//	acct := &Account{}
-//	name := r.FormValue("account")
-//	if name != "" {
-//		acct = &Account{
-//			Name:   name,
-//			Active: true,
-//		}
-//	} else {
-//		dec := json.NewDecoder(r.Body)
-//		defer r.Body.Close()
-//		err := dec.Decode(acct)
-//		if err != nil {
-//			if err == io.EOF {
-//				response.Code = http.StatusBadRequest
-//				response.Message = "Account name must be provided"
-//			} else {
-//				response.Code = http.StatusInternalServerError
-//				response.Message = err.Error()
-//			}
-//			out.Encode(response)
-//			return
-//		}
-//	}
-//	_, aerr := Save(ctx, acct)
-//	if aerr != nil {
-//		ServerError(http.StatusInternalServerError, AccountErrorSave, response, out)
-//		return
-//	}
-//	response.Code = 200
-//	response.Result = acct
-//	out.Encode(response)
 }
 
 func RecipesHandler(w http.ResponseWriter, r *http.Request) {
@@ -412,6 +402,13 @@ func RecipesHandler(w http.ResponseWriter, r *http.Request) {
 	response := &utils.ApiResponse{}
 	ctx := newappengine.NewContext(r)
 	recipes := make([]Recipe, 0, 10)
+
+	token := r.FormValue("at")
+	if token == "" {
+		ServerError(69, "fucking token missing breh", response, out)
+		return
+	}
+
 	if _, err := newdatastore.NewQuery("Recipe").GetAll(ctx, &recipes); err != nil {
 		response.Code = 403
 		response.Message = "Couldn't retrieve recipes from datastore" + " " + err.Error()
