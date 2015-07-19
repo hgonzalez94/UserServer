@@ -35,6 +35,8 @@ func init() {
 	// OAuth2 Handling
 
 	cfg := osin.NewServerConfig()
+	cfg.AllowedAuthorizeTypes = osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
+	cfg.AllowedAccessTypes = osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN, osin.PASSWORD, osin.CLIENT_CREDENTIALS, osin.ASSERTION}
 	cfg.AllowGetAccessRequest = true
 	cfg.AllowClientSecretInParams = true
 	server := osin.NewServer(cfg, NewStorage())
@@ -67,6 +69,7 @@ func init() {
 		if resp.IsError && resp.InternalError != nil {
 			fmt.Printf("ERROR: %s\n", resp.InternalError)
 		}
+
 		osin.OutputJSON(resp, w, r)
 	})
 
@@ -82,7 +85,7 @@ func init() {
 
 	router.HandleFunc("/app", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("<html><body>"))
-		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=code&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Login</a><br/>", url.QueryEscape("http://localhost:8080/appauth/code")))) //URI must be registered
+		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=token&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Login</a><br/>", url.QueryEscape("http://localhost:8080/appauth/code")))) //URI must be registered
 		w.Write([]byte("</body></html>"))
 	})
 
@@ -93,12 +96,13 @@ func init() {
 
 		w.Write([]byte("<html><body>"))
 		w.Write([]byte("APP AUTH - CODE<br/>"))
+		w.Write([]byte("<br/>"))
 		defer w.Write([]byte("</body></html>"))
 
-		if code == "" {
-			w.Write([]byte("Nothing to do"))
-			return
-		}
+//		if code == "" {
+//			w.Write([]byte("Nothing to do"))
+//			return
+//		}
 
 		jr := make(map[string]interface{})
 
@@ -116,15 +120,15 @@ func init() {
 			}
 //		}
 
-		// show json error
-//		if erd, ok := jr["error"]; ok {
-////			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
-//		}
+//		 show json error
+		if erd, ok := jr["error"]; ok {
+			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
+		}
 
-		// show json access token
-//		if at, ok := jr["access_token"]; ok {
-////			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s%s<br/>\n", at)))
-//		}
+//		 show json access token
+		if at, ok := jr["access_token"]; ok {
+			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s%s<br/>\n", at)))
+		}
 
 //		w.Write([]byte(fmt.Sprintf("FULL RESULT: %+v\n%s<br/>\n", jr, aurl)))
 
@@ -135,11 +139,11 @@ func init() {
 		response := &utils.ApiResponse{}
 		ServerResponse(200, "successful get request", jr, response, out)
 
-		cururl := *r.URL
-		curq := cururl.Query()
-		curq.Add("doparse", "1")
-		cururl.RawQuery = curq.Encode()
-		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Download Token</a><br/>", cururl.String())))
+//		cururl := *r.URL
+//		curq := cururl.Query()
+//		curq.Add("doparse", "1")
+//		cururl.RawQuery = curq.Encode()
+//		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Download Token</a><br/>", cururl.String())))
 
 //		ctx := newappengine.NewContext(r)
 //		client := newurlfetch.Client(ctx)
