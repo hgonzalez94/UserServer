@@ -11,8 +11,7 @@ import (
 	"fmt"
 	"encoding/json"
 	"github.com/mrvdot/golang-utils"
-	"github.com/RangelReale/osin"
-	"github.com/RangelReale/osin/example"
+	"github.com/hgonzalez94/osin"
 	"net/url"
 //	newurlfetch "google.golang.org/appengine/urlfetch"
 //	"io/ioutil"
@@ -46,9 +45,9 @@ func init() {
 		defer resp.Close()
 
 		if ar := server.HandleAuthorizeRequest(resp, r); ar != nil {
-			if !example.HandleLoginPage(ar, w, r) {
-				return
-			}
+//			if !example.HandleLoginPage(ar, w, r) {
+//				return
+//			}
 			ar.Authorized = true
 			server.FinishAuthorizeRequest(resp, r, ar)
 		}
@@ -112,12 +111,12 @@ func init() {
 
 		// if parse, download and parse json
 //		if r.Form.Get("doparse") == "1" {
-			err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-				&osin.BasicAuth{"1234", "aabbccdd"}, jr, r)
-			if err != nil {
-				w.Write([]byte(err.Error()))
-				w.Write([]byte("<br/>"))
-			}
+//			err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+//				&osin.BasicAuth{"1234", "aabbccdd"}, jr, r)
+//			if err != nil {
+//				w.Write([]byte(err.Error()))
+//				w.Write([]byte("<br/>"))
+//			}
 //		}
 
 //		 show json error

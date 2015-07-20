@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/net/context"
 	newdatastore "google.golang.org/appengine/datastore"
-	"github.com/RangelReale/osin"
+	"github.com/hgonzalez94/osin"
 )
 
 var (
