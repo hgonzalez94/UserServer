@@ -11,8 +11,7 @@ import (
 	"fmt"
 	"encoding/json"
 	"github.com/mrvdot/golang-utils"
-	"github.com/RangelReale/osin"
-	"github.com/RangelReale/osin/example"
+	"github.com/hgonzalez94/osin"
 	"net/url"
 )
 
@@ -85,7 +84,7 @@ func init() {
 			server.FinishAccessRequest(resp, r, ar)
 		}
 		if resp.IsError && resp.InternalError != nil {
-			fmt.Printf("ERROR: %s\n", resp.InternalError)
+			fmt.Printf("ERROR__: %s\n", resp.InternalError)
 		}
 		if !resp.IsError {
 			resp.Output["custom_parameter"] = 19923
@@ -139,18 +138,18 @@ func init() {
 			url.QueryEscape("http://localhost:8080/appauth/code"), url.QueryEscape(code))
 
 		// if parse, download and parse json
-		if r.Form.Get("doparse") == "1" {
+//		if r.Form.Get("doparse") == "1" {
 			err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-				&osin.BasicAuth{"1234", "aabbccdd"}, jr)
+				&osin.BasicAuth{"1234", "aabbccdd"}, jr, r)
 			if err != nil {
 				w.Write([]byte(err.Error()))
 				w.Write([]byte("<br/>"))
 			}
-		}
+//		}
 
 		// show json error
 		if erd, ok := jr["error"]; ok {
-			w.Write([]byte(fmt.Sprintf("ERROR: %s<br/>\n", erd)))
+			w.Write([]byte(fmt.Sprintf("ERROR__2: %s<br/>\n", erd)))
 		}
 
 		// show json access token
@@ -207,7 +206,7 @@ func init() {
 
 		// download token
 		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			w.Write([]byte("<br/>"))
@@ -252,7 +251,7 @@ func init() {
 
 		// download token
 		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			w.Write([]byte("<br/>"))
@@ -297,7 +296,7 @@ func init() {
 
 		// download token
 		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			w.Write([]byte("<br/>"))
@@ -350,7 +349,7 @@ func init() {
 
 		// download token
 		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			w.Write([]byte("<br/>"))
@@ -401,7 +400,7 @@ func init() {
 
 		// download token
 		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr)
+			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			w.Write([]byte("<br/>"))
