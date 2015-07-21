@@ -4,6 +4,7 @@ import (
 	"github.com/gorilla/mux"
 	newappengine "google.golang.org/appengine"
 	newdatastore "google.golang.org/appengine/datastore"
+	newurlfetch "google.golang.org/appengine/urlfetch"
 	"golang.org/x/net/context"
 	"github.com/gorilla/schema"
 	"github.com/gorilla/sessions"
@@ -36,6 +37,7 @@ func init() {
 	sconfig.AllowedAccessTypes = osin.AllowedAccessType{osin.AUTHORIZATION_CODE,
 		osin.REFRESH_TOKEN, osin.PASSWORD, osin.CLIENT_CREDENTIALS, osin.ASSERTION}
 	sconfig.AllowGetAccessRequest = true
+	sconfig.AllowClientSecretInParams = false
 	server := osin.NewServer(sconfig, NewStorage())
 
 	router.HandleFunc("/authorize", func(w http.ResponseWriter, r *http.Request) {
@@ -43,9 +45,9 @@ func init() {
 		defer resp.Close()
 
 		if ar := server.HandleAuthorizeRequest(resp, r); ar != nil {
-			if !example.HandleLoginPage(ar, w, r) {
-				return
-			}
+//			if !example.HandleLoginPage(ar, w, r) {
+//				return
+//			}
 			ar.UserData = struct{ Login string }{Login: "test"}
 			ar.Authorized = true
 			server.FinishAuthorizeRequest(resp, r, ar)
@@ -134,18 +136,77 @@ func init() {
 		jr := make(map[string]interface{})
 
 		// build access code url
-		aurl := fmt.Sprintf("/token?grant_type=authorization_code&client_id=1234&state=xyz&redirect_uri=%s&code=%s",
-			url.QueryEscape("http://localhost:8080/appauth/code"), url.QueryEscape(code))
+		aurl := fmt.Sprintf("/token?grant_type=authorization_code&client_id=1234&state=xyz&code=%s&redirect_uri=%s",
+			url.QueryEscape(code), url.QueryEscape("http://localhost:8080/appauth/code"))
 
 		// if parse, download and parse json
 //		if r.Form.Get("doparse") == "1" {
-			err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-				&osin.BasicAuth{"1234", "aabbccdd"}, jr, r)
-			if err != nil {
-				w.Write([]byte(err.Error()))
-				w.Write([]byte("<br/>"))
-			}
+//			err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+//				&osin.BasicAuth{"1234", "aabbccdd"}, jr, r)
+//			if err != nil {
+//				w.Write([]byte(err.Error()))
+//				w.Write([]byte("<br/>"))
+//			}
 //		}
+
+		/* new download method start */
+/*		ctx := newappengine.NewContext(r)
+		client := newurlfetch.Client(ctx)
+		preq, err := client.Get(fmt.Sprintf("http://localhost:8080%s", aurl))
+		defer preq.Body.Close()
+
+		if err != nil {
+			w.Write([]byte("error downloading your shit aftter trying"))
+			w.Write([]byte("<br/>"))
+		}
+
+		preq.Request.SetBasicAuth("1234", "aabbccdd")
+
+		presp, err2 := client.Do(preq.Request)
+		if err2 != nil {
+			w.Write([]byte("error downloading your shit aftter trying 2"))
+			w.Write([]byte("<br/>"))
+		}
+		jdec := json.NewDecoder(presp.Body)
+		jdec.Decode(&jr)
+		w.Write([]byte(fmt.Sprintf("%s", jr["access_token"])))
+		/* new download method end */
+
+		ctx := newappengine.NewContext(r)
+		client := newurlfetch.Client(ctx)
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:8080%s", aurl), nil)
+		if err != nil {
+			w.Write([]byte("error forming req"))
+		}
+		ba := &osin.BasicAuth{"1234", "aabbccdd"}
+		req.SetBasicAuth(ba.Username, ba.Password)
+		res, err2 := client.Do(req)
+		if err2 != nil {
+			w.Write([]byte("error forming res"))
+		}
+		jdec := json.NewDecoder(res.Body)
+		jdec.Decode(&jr)
+
+		/* new download method 3 start */
+/*		preq, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:8080%s", aurl), nil)
+		if err != nil {
+			w.Write([]byte(fmt.Sprintf("ERROR DOWNLOADING: %s", err.Error())))
+		}
+
+		preq.SetBasicAuth("1234", "aabbccdd")
+		pclient := &http.Client{}
+		presp, err2 := pclient.Do(preq)
+		if err2 != nil {
+			w.Write([]byte(fmt.Sprintf("ERROR2 DOWNLOADING: %s", err2.Error())))
+		}
+
+		if presp.StatusCode != 200 {
+			w.Write([]byte(fmt.Sprintf("ERROR3 DOWNLOADING: Invalid Status Code")))
+		}
+
+		jdec := json.NewDecoder(presp.Body)
+		jdec.Decode(&jr)
+		/* new download method 3 end */
 
 		// show json error
 		if erd, ok := jr["error"]; ok {
@@ -162,11 +223,11 @@ func init() {
 		// output links
 		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Goto Token URL</a><br/>", aurl)))
 
-		cururl := *r.URL
-		curq := cururl.Query()
-		curq.Add("doparse", "1")
-		cururl.RawQuery = curq.Encode()
-		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Download Token</a><br/>", cururl.String())))
+//		cururl := *r.URL
+//		curq := cururl.Query()
+//		curq.Add("doparse", "1")
+//		cururl.RawQuery = curq.Encode()
+//		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Download Token</a><br/>", cururl.String())))
 
 		if rt, ok := jr["refresh_token"]; ok {
 			rurl := fmt.Sprintf("/appauth/refresh?code=%s", rt)
@@ -201,16 +262,16 @@ func init() {
 		jr := make(map[string]interface{})
 
 		// build access code url
-		aurl := fmt.Sprintf("/token?grant_type=password&scope=everything&username=%s&password=%s",
-			"test", "test")
+//		aurl := fmt.Sprintf("/token?grant_type=password&scope=everything&username=%s&password=%s",
+//			"test", "test")
 
 		// download token
-		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
-		if err != nil {
-			w.Write([]byte(err.Error()))
-			w.Write([]byte("<br/>"))
-		}
+//		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+//			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
+//		if err != nil {
+//			w.Write([]byte(err.Error()))
+//			w.Write([]byte("<br/>"))
+//		}
 
 		// show json error
 		if erd, ok := jr["error"]; ok {
@@ -247,15 +308,15 @@ func init() {
 		jr := make(map[string]interface{})
 
 		// build access code url
-		aurl := fmt.Sprintf("/token?grant_type=client_credentials")
+//		aurl := fmt.Sprintf("/token?grant_type=client_credentials")
 
 		// download token
-		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
-		if err != nil {
-			w.Write([]byte(err.Error()))
-			w.Write([]byte("<br/>"))
-		}
+//		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+//			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
+//		if err != nil {
+//			w.Write([]byte(err.Error()))
+//			w.Write([]byte("<br/>"))
+//		}
 
 		// show json error
 		if erd, ok := jr["error"]; ok {
@@ -292,15 +353,15 @@ func init() {
 		jr := make(map[string]interface{})
 
 		// build access code url
-		aurl := fmt.Sprintf("/token?grant_type=assertion&assertion_type=urn:osin.example.complete&assertion=osin.data")
+//		aurl := fmt.Sprintf("/token?grant_type=assertion&assertion_type=urn:osin.example.complete&assertion=osin.data")
 
 		// download token
-		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
-		if err != nil {
-			w.Write([]byte(err.Error()))
-			w.Write([]byte("<br/>"))
-		}
+//		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+//			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
+//		if err != nil {
+//			w.Write([]byte(err.Error()))
+//			w.Write([]byte("<br/>"))
+//		}
 
 		// show json error
 		if erd, ok := jr["error"]; ok {
@@ -345,15 +406,15 @@ func init() {
 		jr := make(map[string]interface{})
 
 		// build access code url
-		aurl := fmt.Sprintf("/token?grant_type=refresh_token&refresh_token=%s", url.QueryEscape(code))
+//		aurl := fmt.Sprintf("/token?grant_type=refresh_token&refresh_token=%s", url.QueryEscape(code))
 
 		// download token
-		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
-		if err != nil {
-			w.Write([]byte(err.Error()))
-			w.Write([]byte("<br/>"))
-		}
+//		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+//			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
+//		if err != nil {
+//			w.Write([]byte(err.Error()))
+//			w.Write([]byte("<br/>"))
+//		}
 
 		// show json error
 		if erd, ok := jr["error"]; ok {
@@ -396,15 +457,15 @@ func init() {
 		jr := make(map[string]interface{})
 
 		// build access code url
-		aurl := fmt.Sprintf("/info?code=%s", url.QueryEscape(code))
+//		aurl := fmt.Sprintf("/info?code=%s", url.QueryEscape(code))
 
 		// download token
-		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
-		if err != nil {
-			w.Write([]byte(err.Error()))
-			w.Write([]byte("<br/>"))
-		}
+//		err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
+//			&osin.BasicAuth{Username: "1234", Password: "aabbccdd"}, jr, r)
+//		if err != nil {
+//			w.Write([]byte(err.Error()))
+//			w.Write([]byte("<br/>"))
+//		}
 
 		// show json error
 		if erd, ok := jr["error"]; ok {
