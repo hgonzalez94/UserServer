@@ -13,7 +13,7 @@ import (
 	"github.com/mrvdot/golang-utils"
 	"github.com/hgonzalez94/osin"
 	"net/url"
-//	newurlfetch "google.golang.org/appengine/urlfetch"
+	newurlfetch "google.golang.org/appengine/urlfetch"
 //	"io/ioutil"
 )
 
@@ -106,8 +106,8 @@ func init() {
 		jr := make(map[string]interface{})
 
 		// build access code url
-		aurl := fmt.Sprintf("/token.json?grant_type=authorization_code&client_id=1234&client_secret=aabbccdd&state=xyz&redirect_uri=%s&code=%s",
-			url.QueryEscape("http://localhost:8080/appauth/code"), url.QueryEscape(code))
+		aurl := fmt.Sprintf("/token.json?grant_type=authorization_code&client_id=1234&client_secret=aabbccdd&state=xyz&code=%s&redirect_uri=%s",
+			url.QueryEscape(code), url.QueryEscape("http://localhost:8080/appauth/code"))
 
 		// if parse, download and parse json
 //		if r.Form.Get("doparse") == "1" {
@@ -118,6 +118,21 @@ func init() {
 //				w.Write([]byte("<br/>"))
 //			}
 //		}
+
+		ctx := newappengine.NewContext(r)
+		client := newurlfetch.Client(ctx)
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:8080%s", aurl), nil)
+		if err != nil {
+			w.Write([]byte("error forming req"))
+		}
+		ba := &osin.BasicAuth{"1234", "aabbccdd"}
+		req.SetBasicAuth(ba.Username, ba.Password)
+		res, err2 := client.Do(req)
+		if err2 != nil {
+			w.Write([]byte("error forming res"))
+		}
+		jdec := json.NewDecoder(res.Body)
+		jdec.Decode(&jr)
 
 //		 show json error
 		if erd, ok := jr["error"]; ok {
