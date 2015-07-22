@@ -21,6 +21,7 @@
       <root url="file://$PROJECT_DIR$/../golang.org/x/net/html/testdata" />
       <root url="file://$PROJECT_DIR$/../github.com/gorilla/mux/.git" />
       <root url="file://$PROJECT_DIR$/../golang.org/x/net/.git" />
+      <root url="file://$PROJECT_DIR$/../github.com/hgonzalez94/osin/.git" />
       <root url="file://$PROJECT_DIR$/../golang.org/x/net/html/charset/testdata" />
       <root url="file://$PROJECT_DIR$/../github.com/pborman/uuid/.git" />
       <root url="file://$PROJECT_DIR$/../github.com/gorilla/sessions/.git" />
@@ -38,7 +39,6 @@
       <root url="file://$PROJECT_DIR$/../google.golang.org/appengine/.git" />
       <root url="file://$PROJECT_DIR$/../code.google.com/p/go-uuid/.hg" />
       <root url="file://$PROJECT_DIR$/../golang.org/x/oauth2/.git" />
-      <root url="file://$PROJECT_DIR$/../github.com/RangelReale/osin/.git" />
     </excluded>
   </library>
 </component>

@@ -4,7 +4,6 @@ import (
 	"github.com/gorilla/mux"
 	newappengine "google.golang.org/appengine"
 	newdatastore "google.golang.org/appengine/datastore"
-	newurlfetch "google.golang.org/appengine/urlfetch"
 	"golang.org/x/net/context"
 	"github.com/gorilla/schema"
 	"github.com/gorilla/sessions"
@@ -62,7 +61,7 @@ func init() {
 	})
 
 	// Access token endpoint
-	router.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/token.json", func(w http.ResponseWriter, r *http.Request) {
 		resp := server.NewResponse()
 		defer resp.Close()
 
@@ -109,8 +108,8 @@ func init() {
 	router.HandleFunc("/app", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("<html><body>"))
 
-		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=code&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Code</a><br/>", url.QueryEscape("http://localhost:8080/appauth/code"))))
-		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=token&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Implict</a><br/>", url.QueryEscape("http://localhost:8080/appauth/token"))))
+		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=code&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Code</a><br/>", url.QueryEscape("http://localhost:8080/appauth/code.json"))))
+		w.Write([]byte(fmt.Sprintf("<a href=\"/authorize?response_type=token&client_id=1234&state=xyz&scope=everything&redirect_uri=%s\">Implict</a><br/>", url.QueryEscape("http://localhost:8080/appauth/token.json"))))
 		w.Write([]byte(fmt.Sprintf("<a href=\"/appauth/password\">Password</a><br/>")))
 		w.Write([]byte(fmt.Sprintf("<a href=\"/appauth/client_credentials\">Client Credentials</a><br/>")))
 		w.Write([]byte(fmt.Sprintf("<a href=\"/appauth/assertion\">Assertion</a><br/>")))
@@ -119,137 +118,34 @@ func init() {
 	})
 
 	// Application destination - CODE
-	router.HandleFunc("/appauth/code", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/appauth/code.json", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
+		out := json.NewEncoder(w)
+		response := &utils.ApiResponse{}
 
-		code := r.Form.Get("code")
+		at := r.Form.Get("access_token")
+		tt := r.Form.Get("token_type")
+		ei := r.Form.Get("expires_in")
+		rt := r.Form.Get("refresh_token")
 
-		w.Write([]byte("<html><body>"))
-		w.Write([]byte("APP AUTH - CODE<br/>"))
-		defer w.Write([]byte("</body></html>"))
-
-		if code == "" {
-			w.Write([]byte("Nothing to do"))
-			return
-		}
-
-		jr := make(map[string]interface{})
-
-		// build access code url
-		aurl := fmt.Sprintf("/token?grant_type=authorization_code&client_id=1234&state=xyz&code=%s&redirect_uri=%s",
-			url.QueryEscape(code), url.QueryEscape("http://localhost:8080/appauth/code"))
-
-		// if parse, download and parse json
-//		if r.Form.Get("doparse") == "1" {
-//			err := example.DownloadAccessToken(fmt.Sprintf("http://localhost:8080%s", aurl),
-//				&osin.BasicAuth{"1234", "aabbccdd"}, jr, r)
-//			if err != nil {
-//				w.Write([]byte(err.Error()))
-//				w.Write([]byte("<br/>"))
-//			}
-//		}
-
-		/* new download method start */
-/*		ctx := newappengine.NewContext(r)
-		client := newurlfetch.Client(ctx)
-		preq, err := client.Get(fmt.Sprintf("http://localhost:8080%s", aurl))
-		defer preq.Body.Close()
-
-		if err != nil {
-			w.Write([]byte("error downloading your shit aftter trying"))
-			w.Write([]byte("<br/>"))
-		}
-
-		preq.Request.SetBasicAuth("1234", "aabbccdd")
-
-		presp, err2 := client.Do(preq.Request)
-		if err2 != nil {
-			w.Write([]byte("error downloading your shit aftter trying 2"))
-			w.Write([]byte("<br/>"))
-		}
-		jdec := json.NewDecoder(presp.Body)
-		jdec.Decode(&jr)
-		w.Write([]byte(fmt.Sprintf("%s", jr["access_token"])))
-		/* new download method end */
-
-		ctx := newappengine.NewContext(r)
-		client := newurlfetch.Client(ctx)
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:8080%s", aurl), nil)
-		if err != nil {
-			w.Write([]byte("error forming req"))
-		}
-		ba := &osin.BasicAuth{"1234", "aabbccdd"}
-		req.SetBasicAuth(ba.Username, ba.Password)
-		res, err2 := client.Do(req)
-		if err2 != nil {
-			w.Write([]byte("error forming res"))
-		}
-		jdec := json.NewDecoder(res.Body)
-		jdec.Decode(&jr)
-
-		/* new download method 3 start */
-/*		preq, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:8080%s", aurl), nil)
-		if err != nil {
-			w.Write([]byte(fmt.Sprintf("ERROR DOWNLOADING: %s", err.Error())))
-		}
-
-		preq.SetBasicAuth("1234", "aabbccdd")
-		pclient := &http.Client{}
-		presp, err2 := pclient.Do(preq)
-		if err2 != nil {
-			w.Write([]byte(fmt.Sprintf("ERROR2 DOWNLOADING: %s", err2.Error())))
-		}
-
-		if presp.StatusCode != 200 {
-			w.Write([]byte(fmt.Sprintf("ERROR3 DOWNLOADING: Invalid Status Code")))
-		}
-
-		jdec := json.NewDecoder(presp.Body)
-		jdec.Decode(&jr)
-		/* new download method 3 end */
-
-		// show json error
-		if erd, ok := jr["error"]; ok {
-			w.Write([]byte(fmt.Sprintf("ERROR__2: %s<br/>\n", erd)))
-		}
-
-		// show json access token
-		if at, ok := jr["access_token"]; ok {
-			w.Write([]byte(fmt.Sprintf("ACCESS TOKEN: %s<br/>\n", at)))
-		}
-
-		w.Write([]byte(fmt.Sprintf("FULL RESULT: %+v<br/>\n", jr)))
-
-		// output links
-		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Goto Token URL</a><br/>", aurl)))
-
-//		cururl := *r.URL
-//		curq := cururl.Query()
-//		curq.Add("doparse", "1")
-//		cururl.RawQuery = curq.Encode()
-//		w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Download Token</a><br/>", cururl.String())))
-
-		if rt, ok := jr["refresh_token"]; ok {
-			rurl := fmt.Sprintf("/appauth/refresh?code=%s", rt)
-			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Refresh Token</a><br/>", rurl)))
-		}
-
-		if at, ok := jr["access_token"]; ok {
-			rurl := fmt.Sprintf("/appauth/info?code=%s", at)
-			w.Write([]byte(fmt.Sprintf("<a href=\"%s\">Info</a><br/>", rurl)))
-		}
+		result := map[string]interface{}{"access_token": at, "token_type": tt, "expires_in": ei, "refresh_token": rt}
+		ServerResponse(200, "Access Info Success", result, response, out)
+		/** End Download Access Token **/
 	})
 
 	// Application destination - TOKEN
-	router.HandleFunc("/appauth/token", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/appauth/token.json", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
+		out := json.NewEncoder(w)
+		response := &utils.ApiResponse{}
 
-		w.Write([]byte("<html><body>"))
-		w.Write([]byte("APP AUTH - TOKEN<br/>"))
+		at := r.Form.Get("access_token")
+		tt := r.Form.Get("token_type")
+		ei := r.Form.Get("expires_in")
+		rt := r.Form.Get("refresh_token")
 
-		w.Write([]byte("Response data in fragment - not acessible via server - Nothing to do"))
-
-		w.Write([]byte("</body></html>"))
+		result := map[string]interface{}{"access_token": at, "token_type": tt, "expires_in": ei, "refresh_token": rt}
+		ServerResponse(200, "Access Info Success", result, response, out)
 	})
 
 	// Application destination - PASSWORD
