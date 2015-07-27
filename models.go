@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"crypto/md5"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -16,6 +15,7 @@ import (
 	"golang.org/x/net/context"
 	newdatastore "google.golang.org/appengine/datastore"
 	"github.com/hgonzalez94/osin"
+	"errors"
 )
 
 var (
@@ -25,24 +25,6 @@ var (
 	sessionToAccount      = map[*Session]*Account{}
 	sessionToUser         = map[*Session]*User{}
 	sessionsMap              = map[string]*Session{}
-// Unauthenticated is returned when a request was not successfully authenticated
-	Unauthenticated = errors.New("No account has been authenticated for this request")
-// NoSuchSession is returned when the session key passed does not correspond to an active session
-	NoSuchSession = errors.New("No account matches that session")
-// NoSuchAccount is returned when no account can be found matching the specified slug
-	NoSuchAccount = errors.New("No account matches that slug")
-// InvalidApiKey is returned when the specified ApiKey does not match account
-	InvalidApiKey = errors.New("API Key does not match account")
-// SessionExpired is returned when the specified session has not been used within Session.TTL
-	SessionExpired = errors.New("Session has expired, please reauthenticate")
-// Invalid password means the password specified for a username doesn't match what we have stored
-	InvalidPassword = errors.New("That password is not valid for this user")
-
-	InvalidUserForm = errors.New("Unable to create a user from supplied form data")
-	InvalidAcctUsr = errors.New("Unable to create an account from supplied user")
-	InvalidRecipeForm = errors.New("Unable to create a recipe from supplied form data")
-	InvalidTagForm = errors.New("Unable to create a tag from supplied form data")
-	InvalidRatingForm = errors.New("Unable to create a rating from supplied form data")
 // Headers is a string map to header names used for checking account info in request headers
 	Headers = map[string]string{
 		"account":  "X-account",  // Account slug
@@ -55,16 +37,22 @@ var (
 	SessionTTL = time.Duration(3 * time.Hour)
 )
 
-/**
-	oAuth2
- */
-
+/** oAuth2 models **/
 type Storage struct {
 	clients 	map[string]osin.Client
 	authorize 	map[string]*osin.AuthorizeData
 	access    	map[string]*osin.AccessData
 	refresh   	map[string]string
 }
+
+type OACred struct {
+	Key				*newdatastore.Key	`json:"-" newdatastore:"-"`
+	ID				int64				`json:"id"`
+	ClientKey		string				`json:"client_key"`
+	ClientSecret	string				`json:"client_secret"`
+	RedirectURI		string				`json:"redirect_uri"`
+}
+/** end oAuth2 models **/
 
 //type Account holds the basic information for an attached account
 type Account struct {
@@ -79,15 +67,16 @@ type Account struct {
 
 type User struct {
 	Key					*newdatastore.Key        `json:"-" newdatastore:"-"`
-	ID					int64                `json:"id"`
-	Created				time.Time            `json:"created"`
-	LastLogin         time.Time      		`json:"lastLogin"`
-	Username			string                `json:"username"`
-	Email				string                `json:"email"`
-	Password			string                `json:"password" newdatastore:"-"`
-	EncryptedPassword	[]byte                `json:"-"`
-	FirstName			string                `json:"firstName"`
-	LastName			string                `json:"lastName"`
+	ID					int64               	 `json:"id"`
+	Created				time.Time           	 `json:"created"`
+	LastLogin         time.Time      			 `json:"lastLogin"`
+	Username			string              	 `json:"username"`
+	Email				string                	 `json:"email"`
+	Password			string                   `json:"password" newdatastore:"-"`
+	Permission			string				  	 `json:"permission"`
+	EncryptedPassword	[]byte                	 `json:"-"`
+	FirstName			string                	 `json:"firstName"`
+	LastName			string                	 `json:"lastName"`
 	AccountKey        	*newdatastore.Key        `json:"-"`
 	account           	*Account
 
@@ -132,17 +121,20 @@ type Session struct {
 	TTL         time.Duration  `json:"ttl"`         //How long should this session be valid after LastUsed
 }
 
-/**
-	oAuth2 functions
- */
-
-func NewStorage() *Storage {
+/** oAuth2 functions **/
+func NewStorage(/*cred *OACred*/) *Storage {
 	r := &Storage{
 		clients:   make(map[string]osin.Client),
 		authorize: make(map[string]*osin.AuthorizeData),
 		access:    make(map[string]*osin.AccessData),
 		refresh:   make(map[string]string),
 	}
+
+//	r.clients[cred.ClientKey] = &osin.DefaultClient{
+//		Id:				cred.ClientKey,
+//		Secret: 		cred.ClientSecret,
+//		RedirectUri:	cred.RedirectURI,
+//	}
 
 	r.clients["1234"] = &osin.DefaultClient{
 		Id:          "1234",
@@ -153,12 +145,8 @@ func NewStorage() *Storage {
 	return r
 }
 
-func (s *Storage) Clone() osin.Storage {
-	return s
-}
-
-func (s *Storage) Close() {
-}
+func (s *Storage) Clone() osin.Storage { return s }
+func (s *Storage) Close() { }
 
 func (s *Storage) GetClient(id string) (osin.Client, error) {
 	fmt.Printf("GetClient: %s\n", id)
@@ -230,7 +218,8 @@ func (s *Storage) RemoveRefresh(code string) error {
 	delete(s.refresh, code)
 	return nil
 }
-// TODO - validate uniqueness for username
+/** end oAuth2 functions **/
+
 // TODO - Move to PropertyLoadSaver for encryption/decryption
 // TODO - Utilize MarshalJSON to remove password
 func (u *User) BeforeSave(ctx context.Context) {

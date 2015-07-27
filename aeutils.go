@@ -12,16 +12,12 @@ import (
 	"github.com/qedus/nds"
 
 	"golang.org/x/net/context"
-//	"golang.org/x/oauth2"
-//	"golang.org/x/oauth2/google"
-//
-//	newappengine "google.golang.org/appengine"
-	newdatastore "google.golang.org/appengine/datastore"
-//	newurlfetch "google.golang.org/appengine/urlfetch"
 
-//	"appengine"
-//	"appengine/datastore"
+	newappengine "google.golang.org/appengine"
+	newdatastore "google.golang.org/appengine/datastore"
+
 	"encoding/json"
+	"net/http"
 )
 
 const (
@@ -233,7 +229,7 @@ func getDatastoreKind(kind reflect.Type) (dsKind string) {
 	return
 }
 
-// Json Encoded Errors
+/** Server Responses **/
 func ServerResponse(code int, msg string, result interface{}, data *utils.ApiResponse, out *json.Encoder) {
 	data.Code = code
 	data.Message = msg
@@ -246,3 +242,86 @@ func ServerError(code int, msg string, data *utils.ApiResponse, out *json.Encode
 	data.Message = msg
 	out.Encode(data)
 }
+
+/** Server Utility Methods **/
+func UserCredentialsAreUnique(username string, email string, r *http.Request) bool {
+	ctx := newappengine.NewContext(r)
+	user := make([]User, 0, 1)
+	if email != "" {
+		if _, err := newdatastore.NewQuery("User").Filter("Email =", email).Limit(1).GetAll(ctx, &user); err != nil {
+			return false
+		}
+	}
+	if username != "" {
+		if _, err := newdatastore.NewQuery("User").Filter("Username =", username).Limit(1).GetAll(ctx, &user); err != nil {
+			return false
+		}
+	}
+	if len(user) < 1 { return true }
+	return false
+}
+
+/** Model Utility Methods **/
+func NewUserFromFormData(r *http.Request) (*User, error) {
+	firstName := r.FormValue("firstName")
+	lastName := r.FormValue("lastName")
+	username := r.FormValue("username")
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+
+	if firstName != "" && lastName != "" && username != "" && email != "" && password != "" {
+		user := &User{
+			Username:	username,
+			FirstName:	firstName,
+			LastName:	lastName,
+			Email:		email,
+		}
+		return user, nil
+	}
+
+	return nil, InvalidUserForm
+}
+
+func NewRecipeFromFormData(r *http.Request) (*Recipe, error) {
+	name := r.FormValue("name")
+	imgUrl := r.FormValue("imgUrl")
+
+	if name != "" && imgUrl != "" {
+		recipe := &Recipe{
+			Name:	name,
+			ImgUrl: imgUrl,
+		}
+		return recipe, nil
+	}
+	return nil, InvalidRecipeForm
+}
+
+func NewTagFromFormData(r *http.Request) (*Tag, error) {
+	name := r.FormValue("name")
+
+	if name != "" {
+		tag := &Tag{
+			Name:	name,
+		}
+		return tag, nil
+	}
+	return nil, InvalidTagForm
+}
+
+func NewAccountFromUser(user *User) (*Account, error) {
+	uname := ""
+	if user.Username != "" {
+		uname = user.Email
+	} else if user.Email != "" {
+		uname = user.Email
+	}
+	if uname != "" {
+		acct := &Account{
+			Name:	uname,
+			Active:	true,
+		}
+		return acct, nil
+	}
+	return nil, InvalidAcctUsr
+}
+
