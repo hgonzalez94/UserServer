@@ -120,6 +120,7 @@ func init() {
 	router.HandleFunc("/tags/new.json", CreateNewTag).
 		Methods("POST", "GET").
 		Name("CreateTag")
+	router.HandleFunc("/tags/gen.json", GenerateTags)
 
 	// Ratings
 	router.HandleFunc("/ratings.json", RatingsHandler)

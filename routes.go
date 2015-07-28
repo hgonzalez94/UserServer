@@ -82,6 +82,31 @@ func RecipesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 /** Tag Handlers **/
+// TODO: Validate uniqueness...in save method
+func GenerateTags(w http.ResponseWriter, r *http.Request) {
+	out := json.NewEncoder(w)
+	response := &utils.ApiResponse{}
+	ctx := newappengine.NewContext(r)
+	tagNames := []string{"Dinner", "Lunch", "Breakfast", "Vegetarian", "Treat", "Desert"}
+	savedTags := []Tag{}
+	tagIdx := 0
+	for tagIdx < len(tagNames) {
+		tag := &Tag{
+			Name:      tagNames[tagIdx],
+			CreatorID: 1,
+		}
+		_, terr := Save(ctx, tag)
+		if terr != nil {
+			ServerError(ServerExecutionError, NewTagError+"couldn't create tags "+terr.Error(), response, out)
+			break
+		} else {
+			savedTags = append(savedTags, *tag)
+			tagIdx++
+		}
+	}
+	ServerResponse(ServerExecutionSuccess, NewTagSuccess, savedTags, response, out)
+}
+
 func TagsHandler(w http.ResponseWriter, r *http.Request) {
 	out := json.NewEncoder(w)
 	response := &utils.ApiResponse{}
