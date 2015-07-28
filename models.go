@@ -10,12 +10,10 @@ import (
 
 	"code.google.com/p/go-uuid/uuid"
 
-	"github.com/qedus/nds"
-
+	"errors"
+	"github.com/hgonzalez94/osin"
 	"golang.org/x/net/context"
 	newdatastore "google.golang.org/appengine/datastore"
-	"github.com/hgonzalez94/osin"
-	"errors"
 )
 
 var (
@@ -24,8 +22,8 @@ var (
 	authenticatedUsers    = map[string]*User{}
 	sessionToAccount      = map[*Session]*Account{}
 	sessionToUser         = map[*Session]*User{}
-	sessionsMap              = map[string]*Session{}
-// Headers is a string map to header names used for checking account info in request headers
+	sessionsMap           = map[string]*Session{}
+	// Headers is a string map to header names used for checking account info in request headers
 	Headers = map[string]string{
 		"account":  "X-account",  // Account slug
 		"key":      "X-key",      // Account key
@@ -33,96 +31,92 @@ var (
 		"username": "X-username", // Username (for auth by user instead of account)
 		"password": "X-password", // Password (for auth by user)
 	}
-// SessionTTL is a time.Duration for how long a session should remain valid since LastUsed
+	// SessionTTL is a time.Duration for how long a session should remain valid since LastUsed
 	SessionTTL = time.Duration(3 * time.Hour)
 )
 
 /** oAuth2 models **/
 type Storage struct {
-	clients 	map[string]osin.Client
-	authorize 	map[string]*osin.AuthorizeData
-	access    	map[string]*osin.AccessData
-	refresh   	map[string]string
+	clients   map[string]osin.Client
+	authorize map[string]*osin.AuthorizeData
+	access    map[string]*osin.AccessData
+	refresh   map[string]string
 }
 
 type OACred struct {
-	Key				*newdatastore.Key	`json:"-" newdatastore:"-"`
-	ID				int64				`json:"id"`
-	ClientKey		string				`json:"client_key"`
-	ClientSecret	string				`json:"client_secret"`
-	RedirectURI		string				`json:"redirect_uri"`
+	Key          *newdatastore.Key `json:"-" newdatastore:"-"`
+	ID           int64             `json:"id"`
+	ClientKey    string            `json:"client_key"`
+	ClientSecret string            `json:"client_secret"`
+	RedirectURI  string            `json:"redirect_uri"`
 }
+
 /** end oAuth2 models **/
 
 //type Account holds the basic information for an attached account
 type Account struct {
 	Key     *newdatastore.Key `json:"-" newdatastore:"-"` //Locally cached key
-	ID      string         `json:"id"`
-	Created time.Time      `json:"created"` //When account was first created
-	Name    string         `json:"name"`    //Name of account
-	Slug    string         `json:"slug"`    //Unique slug
-	ApiKey  string         `json:"apikey"`  //Generated API Key for this account // TODO - encrypt this
-	Active  bool           `json:"active"`  //True if this account is active
+	ID      string            `json:"id"`
+	Created time.Time         `json:"created"` //When account was first created
+	Name    string            `json:"name"`    //Name of account
+	Slug    string            `json:"slug"`    //Unique slug
+	ApiKey  string            `json:"apikey"`  //Generated API Key for this account // TODO - encrypt this
+	Active  bool              `json:"active"`  //True if this account is active
 }
 
 type User struct {
-	Key					*newdatastore.Key        `json:"-" newdatastore:"-"`
-	ID					int64               	 `json:"id"`
-	Created				time.Time           	 `json:"created"`
-	LastLogin         time.Time      			 `json:"lastLogin"`
-	Username			string              	 `json:"username"`
-	Email				string                	 `json:"email"`
-	Password			string                   `json:"password" newdatastore:"-"`
-	Permission			string				  	 `json:"permission"`
-	EncryptedPassword	[]byte                	 `json:"-"`
-	FirstName			string                	 `json:"firstName"`
-	LastName			string                	 `json:"lastName"`
-	AccountKey        	*newdatastore.Key        `json:"-"`
-	account           	*Account
-
+	Key               *newdatastore.Key `json:"-" newdatastore:"-"`
+	ID                int64             `json:"id"`
+	Created           time.Time         `json:"created"`
+	LastLogin         time.Time         `json:"lastLogin"`
+	Username          string            `json:"username"`
+	Email             string            `json:"email"`
+	Password          string            `json:"password" newdatastore:"-"`
+	Permission        string            `json:"permission"`
+	EncryptedPassword []byte            `json:"-"`
+	FirstName         string            `json:"firstName"`
+	LastName          string            `json:"lastName"`
+	AccountName       string            `json:"acc_key"`
 }
 
 type Recipe struct {
-	Key				*newdatastore.Key            `json:"-" newdatastore:"-"`
-	ID				int64                    `json:"id"`
-	Created			time.Time                `json:"created"`
-	Name			string                    `json:"name"`
-	Slug			string                    `json:"slug"`
-	ImgUrl			string                    `json:"imgUrl"`
-	TagKey			*newdatastore.Key            `json:"-"`
-//	Tag				*Tag						`json:"-" newdatastore:"-"`
+	Key       *newdatastore.Key `json:"-" newdatastore:"-"`
+	ID        int64             `json:"id"`
+	Created   time.Time         `json:"created"`
+	Name      string            `json:"name"`
+	Slug      string            `json:"slug"`
+	ImgUrl    string            `json:"imgUrl"`
+	CreatorID int64             `json:"creatorID"`
+	TagIDs    []int64           `json:"tagIDs"`
 }
 
 type Tag struct {
-	Key				*newdatastore.Key        `json:"-" newdatastore:"-"`
-	ID				int64                `json:"id"`
-	Created			time.Time            `json:"created"`
-	Name			string                `json:"name"`
-	CreatorKey		*newdatastore.Key        `json:"creator"`
-	Creator			*User
+	Key       *newdatastore.Key `json:"-" newdatastore:"-"`
+	ID        int64             `json:"id"`
+	Created   time.Time         `json:"created"`
+	Name      string            `json:"name"`
+	CreatorID int64             `json:"creatorID"`
 }
 
 type Rating struct {
-	Key				*newdatastore.Key        `json:"-" newdatastore:"-"`
-	ID				int64                `json:"id"`
-	Created			time.Time            `json:"created"`
-	User			*User                `json:"user"`
-	Rating			int64                `json:"rating"`
-	RecipeKey		*newdatastore.Key        `json:"recipe" newdatastore:"-"`
-	Recipe			*Recipe
+	Key       *newdatastore.Key `json:"-" newdatastore:"-"`
+	ID        int64             `json:"id"`
+	Created   time.Time         `json:"created"`
+	CreatorID int64             `json:"creatorID"`
+	RecipeID  int64             `json:"recipeID"`
 }
 
 type Session struct {
-	Key         string         `json:"key"` //Session Key provided for identification
+	Key         string            `json:"key"` //Session Key provided for identification
 	User        *newdatastore.Key `json:"-"`
-	Account     *newdatastore.Key `json:"-"`   //Key to actual account
-	Initialized time.Time      `json:"initialized"` //Time session was first created
-	LastUsed    time.Time      `json:"lastUsed"`    //Last time session was used
-	TTL         time.Duration  `json:"ttl"`         //How long should this session be valid after LastUsed
+	Account     *newdatastore.Key `json:"-"`           //Key to actual account
+	Initialized time.Time         `json:"initialized"` //Time session was first created
+	LastUsed    time.Time         `json:"lastUsed"`    //Last time session was used
+	TTL         time.Duration     `json:"ttl"`         //How long should this session be valid after LastUsed
 }
 
 /** oAuth2 functions **/
-func NewStorage(/*cred *OACred*/) *Storage {
+func NewStorage( /*cred *OACred*/ ) *Storage {
 	r := &Storage{
 		clients:   make(map[string]osin.Client),
 		authorize: make(map[string]*osin.AuthorizeData),
@@ -130,11 +124,11 @@ func NewStorage(/*cred *OACred*/) *Storage {
 		refresh:   make(map[string]string),
 	}
 
-//	r.clients[cred.ClientKey] = &osin.DefaultClient{
-//		Id:				cred.ClientKey,
-//		Secret: 		cred.ClientSecret,
-//		RedirectUri:	cred.RedirectURI,
-//	}
+	//	r.clients[cred.ClientKey] = &osin.DefaultClient{
+	//		Id:				cred.ClientKey,
+	//		Secret: 		cred.ClientSecret,
+	//		RedirectUri:	cred.RedirectURI,
+	//	}
 
 	r.clients["1234"] = &osin.DefaultClient{
 		Id:          "1234",
@@ -146,7 +140,7 @@ func NewStorage(/*cred *OACred*/) *Storage {
 }
 
 func (s *Storage) Clone() osin.Storage { return s }
-func (s *Storage) Close() { }
+func (s *Storage) Close()              {}
 
 func (s *Storage) GetClient(id string) (osin.Client, error) {
 	fmt.Printf("GetClient: %s\n", id)
@@ -218,9 +212,9 @@ func (s *Storage) RemoveRefresh(code string) error {
 	delete(s.refresh, code)
 	return nil
 }
+
 /** end oAuth2 functions **/
 
-// TODO - Move to PropertyLoadSaver for encryption/decryption
 // TODO - Utilize MarshalJSON to remove password
 func (u *User) BeforeSave(ctx context.Context) {
 	if u.Password != "" {
@@ -228,7 +222,7 @@ func (u *User) BeforeSave(ctx context.Context) {
 		u.Password = ""
 		encrypted, err := encrypt([]byte(pw))
 		if err != nil {
-//			ctx.Errorf("Error encoding password: %v", err.Error())
+			//			ctx.Errorf("Error encoding password: %v", err.Error())
 			return
 		}
 		u.EncryptedPassword = encrypted
@@ -241,9 +235,9 @@ func (u *User) BeforeSave(ctx context.Context) {
 		}
 	}
 	// If we've already registered this call within an account, go ahead and assign said account to user
-	if acct, _ := GetAccount(ctx); acct != nil {
+	/*	if acct, _ := GetAccount(ctx); acct != nil {
 		u.AccountKey = acct.Key
-	}
+	}*/
 	if u.Created.IsZero() {
 		u.Created = time.Now()
 	}
@@ -269,27 +263,6 @@ func (u *User) validatePassword(password string) bool {
 	return bytes.Equal([]byte(password), decrypted)
 }
 
-func (u *User) Account(ctx context.Context) *Account {
-	if u.AccountKey == nil {
-		return nil
-	}
-	if u.account == nil {
-		acct := &Account{}
-		var err error
-		if UseNDS {
-			err = nds.Get(ctx, u.AccountKey, acct)
-		} else {
-			err = newdatastore.Get(ctx, u.AccountKey, acct)
-		}
-		if err != nil {
-//			ctx.Errorf("Error retrieving account for user: %v", err.Error())
-			return nil
-		}
-		u.account = acct
-	}
-	return u.account
-}
-
 // Validate a username and password, returning the appropriate user object is one is found
 func AuthenticateUser(ctx context.Context, username, password string) (*User, error) {
 	u := &User{
@@ -306,8 +279,8 @@ func AuthenticateUser(ctx context.Context, username, password string) (*User, er
 // Authenticate a user based on the current values for username and password
 func (u *User) Authenticate(ctx context.Context) error {
 	query := newdatastore.NewQuery("User").
-	Filter("Username =", u.Username).
-	Limit(1)
+		Filter("Username =", u.Username).
+		Limit(1)
 
 	// We only check account if it's already set, so don't worry about an error
 	acct, _ := GetAccount(ctx)
@@ -319,7 +292,7 @@ func (u *User) Authenticate(ctx context.Context) error {
 	_, err := iter.Next(u)
 	if err != nil {
 		if err != newdatastore.Done {
-//			ctx.Errorf("Error loading user: %v", err.Error())
+			//			ctx.Errorf("Error loading user: %v", err.Error())
 		}
 		// If it's just a mismatch, keep going, likely just changed structure
 		if _, ok := err.(*newdatastore.ErrFieldMismatch); !ok {
@@ -430,18 +403,13 @@ func (acct *Account) BeforeSave(ctx context.Context) {
 	}
 }
 
-// func Load initializes an account with any necessary calculated values
-func (acct *Account) Load(ctx context.Context) {
-	acct.GetKey(ctx)
-}
-
 func (acct *Account) Session(ctx context.Context) *Session {
 	if session, err := GetSession(ctx); err == nil {
 		return session
 	}
 	session, err := createSession(ctx, acct, nil)
 	if err != nil {
-//		ctx.Errorf("Error creating session: %v", err.Error())
+		//		ctx.Errorf("Error creating session: %v", err.Error())
 		return nil
 	}
 	return session

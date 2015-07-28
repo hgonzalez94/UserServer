@@ -1,24 +1,23 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
-	newappengine "google.golang.org/appengine"
-	newdatastore "google.golang.org/appengine/datastore"
-	"golang.org/x/net/context"
 	"github.com/gorilla/schema"
 	"github.com/gorilla/sessions"
-	"net/http"
-	"fmt"
-	"encoding/json"
-	"github.com/mrvdot/golang-utils"
 	"github.com/hgonzalez94/osin"
+	"github.com/mrvdot/golang-utils"
+	"golang.org/x/net/context"
+	newappengine "google.golang.org/appengine"
+	newdatastore "google.golang.org/appengine/datastore"
+	"net/http"
 	"net/url"
-//	"reflect"
-//	"strconv"
 )
 
 // Global vars
 type AuthFunc func(http.ResponseWriter, *http.Request, *Account)
+
 var c context.Context
 var decoder *schema.Decoder
 var store *sessions.CookieStore
@@ -44,9 +43,9 @@ func init() {
 		defer resp.Close()
 
 		if ar := server.HandleAuthorizeRequest(resp, r); ar != nil {
-//			if !example.HandleLoginPage(ar, w, r) {
-//				return
-//			}
+			//			if !example.HandleLoginPage(ar, w, r) {
+			//				return
+			//			}
 			ar.UserData = struct{ Login string }{Login: "test"}
 			ar.Authorized = true
 			server.FinishAuthorizeRequest(resp, r, ar)
@@ -104,63 +103,32 @@ func init() {
 
 	router.HandleFunc("/users.json", UsersHandler)
 	router.HandleFunc("/users/new.json", NewUserRegistration).
-	Methods("POST", "GET").
-	Name("CreateAccount")
-	router.HandleFunc("/users/authenticate.json", Authenticate).
-	Methods("POST", "GET").
-	Name("Authenticate")
+		Methods("POST", "GET").
+		Name("CreateAccount")
 	router.HandleFunc("/users/current.json", VerificationHandler).
-	Methods("POST", "GET").
-	Name("VerifyEntry")
+		Methods("POST", "GET").
+		Name("VerifyEntry")
 
 	router.HandleFunc("/accounts.json", AccountsHandler)
-	router.HandleFunc("/accounts/authenticate.json", AuthenticateHandler).
-	Methods("POST", "GET").
-	Name("Authenticate")
-
 	// Recipes
 	router.HandleFunc("/recipes.json", RecipesHandler)
 	router.HandleFunc("/recipes/new.json", CreateNewRecipe).
-	Methods("POST", "GET").
-	Name("CreateRecipe")
+		Methods("POST", "GET").
+		Name("CreateRecipe")
 
 	// Tags
 	router.HandleFunc("/tags.json", TagsHandler)
 	router.HandleFunc("/tags/new.json", CreateNewTag).
-	Methods("POST", "GET").
-	Name("CreateTag")
+		Methods("POST", "GET").
+		Name("CreateTag")
 
 	// Hook-up router to go http package
 	http.Handle("/", router)
 }
 
 /**
-	Api Func
- */
-
-func AuthenticateHandler(w http.ResponseWriter, r *http.Request) {
-	out := json.NewEncoder(w)
-	response := &utils.ApiResponse{}
-	ctx := newappengine.NewContext(r)
-	apikey:= r.FormValue("apikey")
-	slug := r.FormValue("slug")
-	if slug != "" && apikey != "" {
-		account, err := authenticateAccount(ctx, slug, apikey)
-		if err != nil {
-			response.Code = ServerExecutionError
-			response.Message = "error fetching account"
-		} else {
-			response.Code = ServerExecutionSuccess
-			response.Message = "success fetching user: " + account.Name
-			response.Result = account
-		}
-	} else {
-		response.Code = http.StatusBadRequest
-		response.Message = "slug must be provided"
-	}
-
-	out.Encode(response)
-}
+Api Func
+*/
 
 func VerificationHandler(w http.ResponseWriter, r *http.Request) {
 	out := json.NewEncoder(w)
@@ -177,23 +145,6 @@ func VerificationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func Authenticate(w http.ResponseWriter, r *http.Request) {
-	ctx := newappengine.NewContext(r)
-	out := json.NewEncoder(w)
-	data := &utils.ApiResponse{}
-	_, err := AuthenticateRequest(r, w)
-	session, err := GetSession(ctx)
-	if err != nil {
-		ServerError(ServerExecutionError, "error fetching user", data, out)
-	} else {
-		data.Code = ServerExecutionSuccess
-		data.Data = map[string]interface{}{
-			"session": session.Key, // Probably not needed anymore, kept for backwards compatibility
-		}
-	}
-	out.Encode(data)
-}
-
 func CreateNewTag(w http.ResponseWriter, r *http.Request) {
 	ctx := newappengine.NewContext(r)
 	out := json.NewEncoder(w)
@@ -204,7 +155,7 @@ func CreateNewTag(w http.ResponseWriter, r *http.Request) {
 	} else {
 		_, terr := Save(ctx, tag)
 		if terr != nil {
-			ServerError(ServerExecutionError, NewTagError + " " + terr.Error(), response, out)
+			ServerError(ServerExecutionError, NewTagError+" "+terr.Error(), response, out)
 		} else {
 			ServerResponse(ServerExecutionSuccess, NewTagSuccess, tag, response, out)
 		}
@@ -225,7 +176,7 @@ func CreateNewRecipe(w http.ResponseWriter, r *http.Request) {
 	} else {
 		_, rerr := Save(ctx, recipe)
 		if rerr != nil {
-			ServerError(ServerExecutionError, NewRecipeError + " " + rerr.Error(), response, out)
+			ServerError(ServerExecutionError, NewRecipeError+" "+rerr.Error(), response, out)
 		} else {
 			ServerResponse(ServerExecutionSuccess, NewRecipeSuccess, recipe, response, out)
 		}
@@ -243,15 +194,16 @@ func NewUserRegistration(w http.ResponseWriter, r *http.Request) {
 		} else {
 			acct, err := NewAccountFromUser(usr)
 			if err != nil {
-				ServerError(ServerExecutionError, AccountErrorSave + " " + err.Error(), response, out)
+				ServerError(ServerExecutionError, AccountErrorSave+" "+err.Error(), response, out)
 			} else {
+				usr.AccountName = acct.Name
 				_, uerr := Save(ctx, usr)
 				if uerr != nil {
-					ServerError(http.StatusInternalServerError, NewUserRegError + " " + uerr.Error(), response, out)
+					ServerError(http.StatusInternalServerError, NewUserRegError+" "+uerr.Error(), response, out)
 				} else {
 					_, aerr := Save(ctx, acct)
 					if aerr != nil {
-						ServerError(http.StatusInternalServerError, NewUserRegError + " " + aerr.Error(), response, out)
+						ServerError(http.StatusInternalServerError, NewUserRegError+" "+aerr.Error(), response, out)
 					} else {
 						result := map[string]interface{}{"account": acct, "user": usr}
 						ServerResponse(UserRegistrationSuccess, NewUserRegSuccess, result, response, out)
@@ -262,29 +214,6 @@ func NewUserRegistration(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ServerError(ServerExecutionError, "Duplicate Username Error", response, out)
 	}
-}
-
-func RecipesHandler(w http.ResponseWriter, r *http.Request) {
-	out := json.NewEncoder(w)
-	response := &utils.ApiResponse{}
-	ctx := newappengine.NewContext(r)
-	recipes := make([]Recipe, 0, 10)
-	if _, err := newdatastore.NewQuery("Recipe").GetAll(ctx, &recipes); err != nil {
-		response.Code = ServerExecutionError
-		response.Message = "Couldn't retrieve recipes from datastore" + " " + err.Error()
-	} else {
-		response.Code = ServerExecutionSuccess
-		response.Message = "dale got all recipes"
-		response.Result = recipes
-		//		data := make(map[string]interface{})
-		//		for idx := range recipes {
-		//			recipe := recipes[idx]
-		//			key := strconv.Itoa(idx)
-		//			data[key] = recipe
-		//		}
-		//		response.Data = data
-	}
-	out.Encode(response)
 }
 
 func TagsHandler(w http.ResponseWriter, r *http.Request) {
@@ -301,51 +230,4 @@ func TagsHandler(w http.ResponseWriter, r *http.Request) {
 		response.Result = tags
 	}
 	out.Encode(response)
-}
-
-// AuthenticatedFunc wraps a function to ensure the request is authenticated
-// before passing through to the wrapped function.
-// Wrapped function can be either http.HandlerFunc or AuthFunc (receives http.ResponseWriter, *http.Request, *Account)
-// BUG - Type switch is panicking way too often right now, need to inspect
-func AuthenticatedFunc(fn interface{}) http.HandlerFunc {
-	return func(rw http.ResponseWriter, req *http.Request) {
-		acct, err := AuthenticateRequest(req, rw)
-		if err != nil {
-			if err == Unauthenticated {
-				rw.WriteHeader(http.StatusUnauthorized)
-			} else {
-				rw.WriteHeader(http.StatusInternalServerError)
-				rw.Write([]byte(err.Error()))
-			}
-			return
-		}
-		switch fn := fn.(type) {
-			case AuthFunc:
-			fn(rw, req, acct)
-			case http.HandlerFunc:
-			fn(rw, req)
-			default:
-			panic("Unsupported func passed to AuthenticatedFunc, must be AuthFunc or http.HandlerFunc")
-		}
-		ClearAuthenticatedRequest(req)
-	}
-}
-
-// AuthenicatedHandler wraps a handler and ensures everything that passes through it
-// is authenticated. Useful when an entire module/subrouter should be gated by authentication
-func AuthenticatedHandler(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		_, err := AuthenticateRequest(req, rw)
-		if err != nil {
-			if err == Unauthenticated {
-				rw.WriteHeader(http.StatusUnauthorized)
-			} else {
-				rw.WriteHeader(http.StatusInternalServerError)
-				rw.Write([]byte(err.Error()))
-			}
-			return
-		}
-		handler.ServeHTTP(rw, req)
-		ClearAuthenticatedRequest(req)
-	})
 }

@@ -18,43 +18,45 @@ import (
 
 	"encoding/json"
 	"net/http"
+	"strconv"
 )
 
 const (
-	AccountErrorFetch	= "Error fetching account"
-	AccountErrorSave	= "Error saving new account"
-	AccountSuccessFetch	= "successfully fetched current account"
+	AccountErrorFetch   = "Error fetching account"
+	AccountErrorSave    = "Error saving new account"
+	AccountSuccessFetch = "successfully fetched current account"
 
-	UserErrorFetch		= "Error fetching user"
-	UserErrorSave		= "Error saving new user"
-	UserSuccessFetch	= "successfully fetched user"
+	UserErrorFetch   = "Error fetching user"
+	UserErrorSave    = "Error saving new user"
+	UserSuccessFetch = "successfully fetched user"
 
-	NewUserRegSuccess	= "successfully registered user"
-	NewUserRegError		= "error registering user"
+	NewUserRegSuccess = "successfully registered user"
+	NewUserRegError   = "error registering user"
 
-	NewRecipeSuccess	= "successfully created new recipe"
-	NewRecipeError		= "error creating new recipe"
-	RecipeFormError		= "error creating recipe from form data"
+	NewRecipeSuccess = "successfully created new recipe"
+	NewRecipeError   = "error creating new recipe"
+	RecipeFormError  = "error creating recipe from form data"
 
-	NewTagSuccess		= "successfully created new tag"
-	NewTagError			= "error creating new tag"
-	TagFormError		= "error creating tag from form data"
+	NewTagSuccess = "successfully created new tag"
+	NewTagError   = "error creating new tag"
+	TagFormError  = "error creating tag from form data"
 )
 
 var (
-// Set to true to use NDS package for Put/Get methods
+	// Set to true to use NDS package for Put/Get methods
 	UseNDS = false
 )
+
 // GenerateUniqueSlug generates a slug that's unique within the newdatastore for this type
 // Uses utils.GenerateSlug for initial slug, and appends "-N" where N is an auto-incrementing number
 // Until it finds a slug that doesn't already exist for this kind
 func GenerateUniqueSlug(ctx context.Context, kind string, s string) (slug string) {
 	slug = utils.GenerateSlug(s)
 	others, err := newdatastore.NewQuery(kind).
-	Filter("Slug = ", slug).
-	Count(ctx)
+		Filter("Slug = ", slug).
+		Count(ctx)
 	if err != nil {
-//		ctx.Errorf("[aeutils/GenerateUniqueSlug] %v", err.Error())
+		//		ctx.Errorf("[aeutils/GenerateUniqueSlug] %v", err.Error())
 		return ""
 	}
 	if others == 0 {
@@ -65,10 +67,10 @@ func GenerateUniqueSlug(ctx context.Context, kind string, s string) (slug string
 	for others > 0 {
 		slug = fmt.Sprintf("%v-%d", baseSlug, counter)
 		others, err = newdatastore.NewQuery(kind).
-		Filter("Slug = ", slug).
-		Count(ctx)
+			Filter("Slug = ", slug).
+			Count(ctx)
 		if err != nil {
-//			ctx.Errorf("[aeutils/GenerateUniqueSlug] %v", err.Error())
+			//			ctx.Errorf("[aeutils/GenerateUniqueSlug] %v", err.Error())
 			return ""
 		}
 		counter = counter + 1
@@ -150,7 +152,7 @@ func Save(ctx context.Context, obj interface{}) (key *newdatastore.Key, err erro
 		key, err = newdatastore.Put(ctx, key, obj)
 	}
 	if err != nil {
-//		ctx.Errorf("[aeutils/Save]: %v", err.Error())
+		//		ctx.Errorf("[aeutils/Save]: %v", err.Error())
 	} else {
 		if keyField.IsValid() {
 			keyField.Set(reflect.ValueOf(key))
@@ -257,8 +259,49 @@ func UserCredentialsAreUnique(username string, email string, r *http.Request) bo
 			return false
 		}
 	}
-	if len(user) < 1 { return true }
+	if len(user) < 1 {
+		return true
+	}
 	return false
+}
+
+func GetAccountFromUser(user *User, r *http.Request) (*Account, error) {
+	ctx := newappengine.NewContext(r)
+	acc := make([]Account, 0, 1)
+	if user != nil {
+		if _, err := newdatastore.NewQuery("Account").Filter("Name =", user.AccountName).Limit(1).GetAll(ctx, &acc); err != nil {
+			return nil, err
+		} else {
+			return &acc[0], nil
+		}
+	}
+	return nil, nil
+}
+
+func GetCreatorFromRecipe(recipe *Recipe, r *http.Request) (*User, error) {
+	ctx := newappengine.NewContext(r)
+	usr := make([]User, 0, 1)
+	if recipe != nil {
+		if _, err := newdatastore.NewQuery("User").Filter("ID =", recipe.CreatorID).Limit(1).GetAll(ctx, &usr); err != nil {
+			return nil, err
+		} else {
+			return &usr[0], nil
+		}
+	}
+	return nil, nil
+}
+
+func GetCreatorFromTag(tag *Tag, r *http.Request) (*User, error) {
+	ctx := newappengine.NewContext(r)
+	usr := make([]User, 0, 1)
+	if tag != nil {
+		if _, err := newdatastore.NewQuery("User").Filter("ID =", tag.CreatorID).Limit(1).GetAll(ctx, &usr); err != nil {
+			return nil, err
+		} else {
+			return &usr[0], nil
+		}
+	}
+	return nil, nil
 }
 
 /** Model Utility Methods **/
@@ -271,10 +314,10 @@ func NewUserFromFormData(r *http.Request) (*User, error) {
 
 	if firstName != "" && lastName != "" && username != "" && email != "" && password != "" {
 		user := &User{
-			Username:	username,
-			FirstName:	firstName,
-			LastName:	lastName,
-			Email:		email,
+			Username:  username,
+			FirstName: firstName,
+			LastName:  lastName,
+			Email:     email,
 		}
 		return user, nil
 	}
@@ -285,11 +328,14 @@ func NewUserFromFormData(r *http.Request) (*User, error) {
 func NewRecipeFromFormData(r *http.Request) (*Recipe, error) {
 	name := r.FormValue("name")
 	imgUrl := r.FormValue("imgUrl")
+	creatorID := r.FormValue("creatorID")
+	creatorIDNum, numErr := strconv.ParseInt(creatorID, 10, 64)
 
-	if name != "" && imgUrl != "" {
+	if name != "" && imgUrl != "" && numErr == nil {
 		recipe := &Recipe{
-			Name:	name,
-			ImgUrl: imgUrl,
+			Name:      name,
+			ImgUrl:    imgUrl,
+			CreatorID: creatorIDNum,
 		}
 		return recipe, nil
 	}
@@ -298,10 +344,13 @@ func NewRecipeFromFormData(r *http.Request) (*Recipe, error) {
 
 func NewTagFromFormData(r *http.Request) (*Tag, error) {
 	name := r.FormValue("name")
+	creatorID := r.FormValue("creatorID")
+	creatorIDNum, numErr := strconv.ParseInt(creatorID, 10, 64)
 
-	if name != "" {
+	if name != "" && numErr == nil {
 		tag := &Tag{
-			Name:	name,
+			Name:      name,
+			CreatorID: creatorIDNum,
 		}
 		return tag, nil
 	}
@@ -317,11 +366,10 @@ func NewAccountFromUser(user *User) (*Account, error) {
 	}
 	if uname != "" {
 		acct := &Account{
-			Name:	uname,
-			Active:	true,
+			Name:   uname,
+			Active: true,
 		}
 		return acct, nil
 	}
 	return nil, InvalidAcctUsr
 }
-
