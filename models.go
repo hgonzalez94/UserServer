@@ -102,6 +102,7 @@ type Rating struct {
 	Key       *newdatastore.Key `json:"-" newdatastore:"-"`
 	ID        int64             `json:"id"`
 	Created   time.Time         `json:"created"`
+	Rating    int               `json:"rating"`
 	CreatorID int64             `json:"creatorID"`
 	RecipeID  int64             `json:"recipeID"`
 }

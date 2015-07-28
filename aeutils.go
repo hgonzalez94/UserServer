@@ -37,9 +37,15 @@ const (
 	NewRecipeError   = "error creating new recipe"
 	RecipeFormError  = "error creating recipe from form data"
 
-	NewTagSuccess = "successfully created new tag"
-	NewTagError   = "error creating new tag"
-	TagFormError  = "error creating tag from form data"
+	NewTagSuccess   = "successfully created new tag"
+	NewTagError     = "error creating new tag"
+	TagFormError    = "error creating tag from form data"
+	TagSuccessFetch = "successfully fetched tags"
+
+	NewRatingSuccess   = "successfully created new rating"
+	NewRatingError     = "error creating new rating"
+	RatingFormError    = "error creating rating from form data"
+	RatingSuccessFetch = "successfully fetched ratings"
 )
 
 var (
@@ -304,6 +310,32 @@ func GetCreatorFromTag(tag *Tag, r *http.Request) (*User, error) {
 	return nil, nil
 }
 
+func GetCreatorFromRating(rating *Rating, r *http.Request) (*User, error) {
+	ctx := newappengine.NewContext(r)
+	usr := make([]User, 0, 1)
+	if rating != nil {
+		if _, err := newdatastore.NewQuery("User").Filter("ID =", rating.CreatorID).Limit(1).GetAll(ctx, &usr); err != nil {
+			return nil, err
+		} else {
+			return &usr[0], nil
+		}
+	}
+	return nil, nil
+}
+
+func GetRecipeFromRating(rating *Rating, r *http.Request) (*Recipe, error) {
+	ctx := newappengine.NewContext(r)
+	rting := make([]Recipe, 0, 1)
+	if rting != nil {
+		if _, err := newdatastore.NewQuery("Recipe").Filter("ID =", rating.RecipeID).Limit(1).GetAll(ctx, &rting); err != nil {
+			return nil, err
+		} else {
+			return &rting[0], nil
+		}
+	}
+	return nil, nil
+}
+
 /** Model Utility Methods **/
 func NewUserFromFormData(r *http.Request) (*User, error) {
 	firstName := r.FormValue("firstName")
@@ -355,6 +387,25 @@ func NewTagFromFormData(r *http.Request) (*Tag, error) {
 		return tag, nil
 	}
 	return nil, InvalidTagForm
+}
+
+func NewRatingFromFormData(r *http.Request) (*Rating, error) {
+	rating := r.FormValue("rating")
+	creatorID := r.FormValue("creatorID")
+	recipeID := r.FormValue("recipeID")
+	creatorIDNum, numErr := strconv.ParseInt(creatorID, 10, 64)
+	recipeIDNum, numErr2 := strconv.ParseInt(recipeID, 10, 64)
+	ratingNum, numErr3 := strconv.Atoi(rating)
+
+	if numErr == nil && numErr2 == nil && numErr3 == nil {
+		rate := &Rating{
+			Rating:    ratingNum,
+			CreatorID: creatorIDNum,
+			RecipeID:  recipeIDNum,
+		}
+		return rate, nil
+	}
+	return nil, InvalidRatingForm
 }
 
 func NewAccountFromUser(user *User) (*Account, error) {

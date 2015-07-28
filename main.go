@@ -10,7 +10,6 @@ import (
 	"github.com/mrvdot/golang-utils"
 	"golang.org/x/net/context"
 	newappengine "google.golang.org/appengine"
-	newdatastore "google.golang.org/appengine/datastore"
 	"net/http"
 	"net/url"
 )
@@ -122,6 +121,12 @@ func init() {
 		Methods("POST", "GET").
 		Name("CreateTag")
 
+	// Ratings
+	router.HandleFunc("/ratings.json", RatingsHandler)
+	router.HandleFunc("/ratings/new.json", CreateNewRating).
+		Methods("POST", "GET").
+		Name("CreateRating")
+
 	// Hook-up router to go http package
 	http.Handle("/", router)
 }
@@ -162,8 +167,21 @@ func CreateNewTag(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func NewRatingFromFormData(r *http.Request) (*Rating, error) {
-	return nil, InvalidRatingForm
+func CreateNewRating(w http.ResponseWriter, r *http.Request) {
+	ctx := newappengine.NewContext(r)
+	out := json.NewEncoder(w)
+	response := &utils.ApiResponse{}
+	tag, err := NewRatingFromFormData(r)
+	if err != nil {
+		ServerError(ServerExecutionError, TagFormError, response, out)
+	} else {
+		_, terr := Save(ctx, tag)
+		if terr != nil {
+			ServerError(ServerExecutionError, NewTagError+" "+terr.Error(), response, out)
+		} else {
+			ServerResponse(ServerExecutionSuccess, NewTagSuccess, tag, response, out)
+		}
+	}
 }
 
 func CreateNewRecipe(w http.ResponseWriter, r *http.Request) {
@@ -214,20 +232,4 @@ func NewUserRegistration(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ServerError(ServerExecutionError, "Duplicate Username Error", response, out)
 	}
-}
-
-func TagsHandler(w http.ResponseWriter, r *http.Request) {
-	out := json.NewEncoder(w)
-	response := &utils.ApiResponse{}
-	ctx := newappengine.NewContext(r)
-	tags := make([]Tag, 0, 10)
-	if _, err := newdatastore.NewQuery("Tag").GetAll(ctx, &tags); err != nil {
-		response.Code = ServerExecutionError
-		response.Message = "Couldn't retrieve tags from datastore" + " " + err.Error()
-	} else {
-		response.Code = ServerExecutionSuccess
-		response.Message = "dale got all tags"
-		response.Result = tags
-	}
-	out.Encode(response)
 }

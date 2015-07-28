@@ -92,7 +92,7 @@ func TagsHandler(w http.ResponseWriter, r *http.Request) {
 		if _, err := newdatastore.NewQuery("Tag").GetAll(ctx, &tags); err != nil {
 			ServerError(ServerExecutionError, "couldnt retrieve tags from datastore", response, out)
 		} else {
-			ServerResponse(ServerExecutionSuccess, UserSuccessFetch, tags, response, out)
+			ServerResponse(ServerExecutionSuccess, TagSuccessFetch, tags, response, out)
 		}
 	} else {
 		tag := make([]Tag, 0, 1)
@@ -106,6 +106,37 @@ func TagsHandler(w http.ResponseWriter, r *http.Request) {
 				} else {
 					result := map[string]interface{}{"creator": usr, "tag": tag[0]}
 					ServerResponse(ServerExecutionSuccess, fmt.Sprintf("retrieved tag with id: %s", id), result, response, out)
+				}
+			}
+		}
+	}
+}
+
+/** Rating Handlers **/
+func RatingsHandler(w http.ResponseWriter, r *http.Request) {
+	out := json.NewEncoder(w)
+	response := &utils.ApiResponse{}
+	ctx := newappengine.NewContext(r)
+	ratings := make([]Rating, 0, 10)
+	id := r.FormValue("id")
+	if id == "" {
+		if _, err := newdatastore.NewQuery("Rating").GetAll(ctx, &ratings); err != nil {
+			ServerError(ServerExecutionError, "couldnt retrieve ratings from datastore", response, out)
+		} else {
+			ServerResponse(ServerExecutionSuccess, RatingSuccessFetch, ratings, response, out)
+		}
+	} else {
+		rating := make([]Rating, 0, 1)
+		num, numErr := strconv.Atoi(id)
+		if _, err := newdatastore.NewQuery("Rating").Filter("ID =", num).Limit(1).GetAll(ctx, &rating); err != nil || numErr != nil {
+			ServerError(ServerExecutionError, fmt.Sprintf("couldnt retrieve rating with id: %s \nError: %s", id, err.Error()), response, out)
+		} else {
+			if len(rating) > 0 {
+				if usr, uErr := GetCreatorFromRating(&rating[0], r); uErr != nil {
+					ServerError(ServerExecutionError, fmt.Sprintf("couldnt retrieve rating with id: %s \nError: %s", id, err.Error()), response, out)
+				} else {
+					result := map[string]interface{}{"creator": usr, "rating": rating[0]}
+					ServerResponse(ServerExecutionSuccess, fmt.Sprintf("retrieved rating with id: %s", id), result, response, out)
 				}
 			}
 		}
