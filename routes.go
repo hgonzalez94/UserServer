@@ -50,6 +50,64 @@ func UsersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+/** API Global Handlers **/
+// TODO: add token validation
+func GetUserContent(w http.ResponseWriter, r *http.Request) {
+	out := json.NewEncoder(w)
+	response := &utils.ApiResponse{}
+	ctx := newappengine.NewContext(r)
+	userID := r.FormValue("userID")
+	if userID == "" {
+		ServerError(ServerExecutionError, "missing userID", response, out)
+	} else {
+		// Fetch Tags
+		tags := []Tag{}
+		userIDNum, numErr := strconv.ParseInt(userID, 10, 64)
+		if _, err := newdatastore.NewQuery("Tag").Filter("CreatorID =", userIDNum).GetAll(ctx, &tags); err != nil || numErr != nil {
+			ServerError(ServerExecutionError, "unable to fetch tags", response, out)
+		} else {
+			// Fetch Recipes
+			recipes := []Recipe{}
+			if _, err2 := newdatastore.NewQuery("Recipe").Filter("CreatorID =", userIDNum).GetAll(ctx, &recipes); err2 != nil {
+				ServerError(ServerExecutionError, "unable to fetch recipes", response, out)
+			} else {
+				result := map[string]interface{}{"tags": tags, "recipes": recipes}
+				ServerResponse(ServerExecutionSuccess, "got user content", result, response, out)
+			}
+		}
+	}
+}
+
+func SetRecipeTags(w http.ResponseWriter, r *http.Request) {
+	out := json.NewEncoder(w)
+	response := &utils.ApiResponse{}
+	ctx := newappengine.NewContext(r)
+
+	decoder := json.NewDecoder(r.Body)
+	payload := map[string]interface{}{}
+	err := decoder.Decode(&payload)
+	if err != nil {
+		ServerError(ServerExecutionError, "failed to decode objects with error: "+err.Error(), response, out)
+	} else {
+		userID := payload["userID"]
+		recipeID := payload["recipeID"]
+		tagIDs := payload["tagIDS"]
+		recipes := []Recipe{}
+		if _, err := newdatastore.NewQuery("Recipe").Filter("CreatorID =", userID).Filter("ID =", recipeID).Limit(1).GetAll(ctx, &recipes); err != nil {
+			ServerError(ServerExecutionError, "unable to retrieve recipes", response, out)
+		} else {
+			recipe := &recipes[0]
+			recipe.TagIDs = tagIDs.([]int64)
+			if _, updateErr := newdatastore.Put(ctx, recipe.Key, recipe); updateErr != nil {
+				ServerError(ServerExecutionError, "unable to update entity", response, out)
+			} else {
+				ServerResponse(ServerExecutionSuccess, "successfully updated entity", recipe, response, out)
+			}
+		}
+
+	}
+}
+
 /** Recipe Handlers **/
 func RecipesHandler(w http.ResponseWriter, r *http.Request) {
 	out := json.NewEncoder(w)

@@ -128,6 +128,10 @@ func init() {
 		Methods("POST", "GET").
 		Name("CreateRating")
 
+	// API
+	router.HandleFunc("/usercontent.json", GetUserContent)
+	router.HandleFunc("/setrecipetags.json", SetRecipeTags)
+
 	// Hook-up router to go http package
 	http.Handle("/", router)
 }
