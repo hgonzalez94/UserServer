@@ -189,21 +189,29 @@ func CreateNewRating(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// TODO: convert formvalues to json body
 func CreateNewRecipe(w http.ResponseWriter, r *http.Request) {
-	ctx := newappengine.NewContext(r)
+	//	ctx := newappengine.NewContext(r)
 	out := json.NewEncoder(w)
 	response := &utils.ApiResponse{}
-	recipe, err := NewRecipeFromFormData(r)
+	test, err := NewRecipeCollectionFromFormBody(r)
 	if err != nil {
-		ServerError(ServerExecutionError, RecipeFormError, response, out)
+		ServerError(ServerExecutionError, err.Error(), response, out)
 	} else {
-		_, rerr := Save(ctx, recipe)
-		if rerr != nil {
-			ServerError(ServerExecutionError, NewRecipeError+" "+rerr.Error(), response, out)
-		} else {
-			ServerResponse(ServerExecutionSuccess, NewRecipeSuccess, recipe, response, out)
-		}
+		ServerResponse(ServerExecutionSuccess, NewRecipeSuccess, test, response, out)
 	}
+
+	//	recipe, err := NewRecipeFromFormData(r)
+	//	if err != nil {
+	//		ServerError(ServerExecutionError, RecipeFormError, response, out)
+	//	} else {
+	//		_, rerr := Save(ctx, recipe)
+	//		if rerr != nil {
+	//			ServerError(ServerExecutionError, NewRecipeError+" "+rerr.Error(), response, out)
+	//		} else {
+	//			ServerResponse(ServerExecutionSuccess, NewRecipeSuccess, recipe, response, out)
+	//		}
+	//	}
 }
 
 func NewUserRegistration(w http.ResponseWriter, r *http.Request) {

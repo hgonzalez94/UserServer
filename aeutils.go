@@ -17,6 +17,7 @@ import (
 	newdatastore "google.golang.org/appengine/datastore"
 
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -357,6 +358,41 @@ func NewUserFromFormData(r *http.Request) (*User, error) {
 	return nil, InvalidUserForm
 }
 
+type test_struct struct {
+	Name      string
+	ImgURL    string
+	CreatorID string
+}
+
+type test_collection struct {
+	Group map[string]test_struct
+}
+
+func NewRecipeCollectionFromFormBody(r *http.Request) (*test_collection, error) {
+	tc := new(test_collection)
+	var data = &tc.Group
+
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(data)
+	if err != nil {
+		return nil, InvalidRecipeForm
+	}
+
+	return tc, nil
+}
+
+func NewRecipeFromFormBody(r *http.Request) (*test_struct, error) {
+	decoder := json.NewDecoder(r.Body)
+	var t test_struct
+	err := decoder.Decode(&t)
+	if err != nil {
+		return nil, InvalidRecipeForm
+	}
+	log.Println("The Name is: " + t.Name)
+
+	return &t, nil
+}
+
 func NewRecipeFromFormData(r *http.Request) (*Recipe, error) {
 	name := r.FormValue("name")
 	imgUrl := r.FormValue("imgUrl")
@@ -372,6 +408,7 @@ func NewRecipeFromFormData(r *http.Request) (*Recipe, error) {
 		return recipe, nil
 	}
 	return nil, InvalidRecipeForm
+	//	return nil, errors.New("invalid form data: " + name + "\n" + imgUrl + "\n" + creatorID + numErr.Error())
 }
 
 func NewTagFromFormData(r *http.Request) (*Tag, error) {
