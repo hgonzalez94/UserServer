@@ -120,6 +120,61 @@ func preSave(ctx context.Context, val reflect.Value) {
 //   Useful for any post save processing that you might want to do
 //
 // Finally, ID and Key fields (if they exist) are set with any generated values from Saving obj
+func Save2(ctx context.Context, obj interface{}) (key *newdatastore.Key, err error) {
+	kind, val := reflect.TypeOf(obj), reflect.ValueOf(obj)
+	str := val
+	if val.Kind() == reflect.Ptr {
+		kind, str = kind.Elem(), val.Elem()
+	}
+	if str.Kind() != reflect.Struct {
+		return nil, errors.New(fmt.Sprintf("Must pass a valid object (struct) to aeutils.Save: passed %v", str.Kind()))
+	}
+	preSave(ctx, val)
+	//check for key field first
+	keyField := str.FieldByName("Key")
+	if keyField.IsValid() {
+		keyInterface := keyField.Interface()
+		key, _ = keyInterface.(*newdatastore.Key)
+	}
+	idField := str.FieldByName("ID")
+	dsKind := getDatastoreKind(kind)
+	if key == nil {
+		if idField.IsValid() && isInt(idField.Kind()) && idField.Int() != 0 {
+			key = newdatastore.NewKey(ctx, dsKind, "", idField.Int(), nil)
+		} else {
+			newId, _, err := newdatastore.AllocateIDs(ctx, dsKind, nil, 1)
+			if err == nil {
+				if idField.IsValid() && isInt(idField.Kind()) {
+					idField.SetInt(newId)
+				}
+				key = newdatastore.NewKey(ctx, dsKind, "", newId, nil)
+			} else {
+				key = newdatastore.NewIncompleteKey(ctx, dsKind, nil)
+			}
+		}
+	}
+	if UseNDS {
+		//		key, err = nds.Put(ctx, key, obj)
+	} else {
+		//		key, err = newdatastore.Put(ctx, key, obj)
+		//		log.Println("savin: " + key)
+	}
+	if err != nil {
+		//		ctx.Errorf("[aeutils/Save]: %v", err.Error())
+	} else {
+		if keyField.IsValid() {
+			keyField.Set(reflect.ValueOf(key))
+		}
+		if idField.IsValid() && isInt(idField.Kind()) {
+			idField.SetInt(key.IntID())
+		}
+		if asMethod := val.MethodByName("AfterSave"); asMethod.IsValid() {
+			asMethod.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(key)})
+		}
+	}
+	return
+}
+
 func Save(ctx context.Context, obj interface{}) (key *newdatastore.Key, err error) {
 	kind, val := reflect.TypeOf(obj), reflect.ValueOf(obj)
 	str := val
@@ -376,6 +431,9 @@ func NewRecipeCollectionFromFormBody(r *http.Request) (*map[string]interface{}, 
 	decoder := json.NewDecoder(r.Body)
 	//	err := decoder.Decode(data)
 	err := decoder.Decode(&tc)
+	var testCollection = tc["test_collection"].(map[string]interface{})
+	var name = testCollection["name"].(string)
+	log.Println("FOUND ME " + name)
 	if err != nil {
 		return nil, InvalidRecipeForm
 	}
