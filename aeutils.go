@@ -368,17 +368,19 @@ type test_collection struct {
 	Group map[string]test_struct
 }
 
-func NewRecipeCollectionFromFormBody(r *http.Request) (*test_collection, error) {
-	tc := new(test_collection)
-	var data = &tc.Group
+func NewRecipeCollectionFromFormBody(r *http.Request) (*map[string]interface{}, error) {
+	//	tc := new(test_collection)
+	var tc map[string]interface{}
+	//	var data = &tc.Group
 
 	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(data)
+	//	err := decoder.Decode(data)
+	err := decoder.Decode(&tc)
 	if err != nil {
 		return nil, InvalidRecipeForm
 	}
 
-	return tc, nil
+	return &tc, nil
 }
 
 func NewRecipeFromFormBody(r *http.Request) (*test_struct, error) {
