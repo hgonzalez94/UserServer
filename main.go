@@ -10,6 +10,7 @@ import (
 	"github.com/mrvdot/golang-utils"
 	"golang.org/x/net/context"
 	newappengine "google.golang.org/appengine"
+	"log"
 	"net/http"
 	"net/url"
 )
@@ -159,7 +160,8 @@ func CreateNewTag(w http.ResponseWriter, r *http.Request) {
 	ctx := newappengine.NewContext(r)
 	out := json.NewEncoder(w)
 	response := &utils.ApiResponse{}
-	tag, err := NewTagFromFormData(r)
+	tag, err := NewTagFromFormBody(r)
+	log.Println("MADE TAG: " + tag.Name)
 	if err != nil {
 		ServerError(ServerExecutionError, TagFormError, response, out)
 	} else {
@@ -176,7 +178,7 @@ func CreateNewRating(w http.ResponseWriter, r *http.Request) {
 	ctx := newappengine.NewContext(r)
 	out := json.NewEncoder(w)
 	response := &utils.ApiResponse{}
-	tag, err := NewRatingFromFormData(r)
+	tag, err := NewRatingFromFormBody(r)
 	if err != nil {
 		ServerError(ServerExecutionError, TagFormError, response, out)
 	} else {
@@ -191,34 +193,39 @@ func CreateNewRating(w http.ResponseWriter, r *http.Request) {
 
 // TODO: convert formvalues to json body
 func CreateNewRecipe(w http.ResponseWriter, r *http.Request) {
-	//	ctx := newappengine.NewContext(r)
+	ctx := newappengine.NewContext(r)
 	out := json.NewEncoder(w)
 	response := &utils.ApiResponse{}
-	test, err := NewRecipeCollectionFromFormBody(r)
-	if err != nil {
-		ServerError(ServerExecutionError, err.Error(), response, out)
-	} else {
-		ServerResponse(ServerExecutionSuccess, NewRecipeSuccess, test, response, out)
-	}
 
-	//	recipe, err := NewRecipeFromFormData(r)
+	// testing collection dynamic json unmarshall code
+	//	test, err := NewRecipeCollectionFromFormBody(r)
 	//	if err != nil {
-	//		ServerError(ServerExecutionError, RecipeFormError, response, out)
+	//		ServerError(ServerExecutionError, err.Error(), response, out)
 	//	} else {
-	//		_, rerr := Save(ctx, recipe)
-	//		if rerr != nil {
-	//			ServerError(ServerExecutionError, NewRecipeError+" "+rerr.Error(), response, out)
-	//		} else {
-	//			ServerResponse(ServerExecutionSuccess, NewRecipeSuccess, recipe, response, out)
-	//		}
+	//		ServerResponse(ServerExecutionSuccess, NewRecipeSuccess, test, response, out)
 	//	}
+
+	// Regular Code
+
+	recipe, err := NewRecipeFromFormBody(r)
+	if err != nil {
+		ServerError(ServerExecutionError, RecipeFormError, response, out)
+	} else {
+		_, rerr := Save(ctx, recipe)
+		if rerr != nil {
+			ServerError(ServerExecutionError, NewRecipeError+" "+rerr.Error(), response, out)
+		} else {
+			ServerResponse(ServerExecutionSuccess, NewRecipeSuccess, recipe, response, out)
+		}
+	}
 }
 
 func NewUserRegistration(w http.ResponseWriter, r *http.Request) {
 	ctx := newappengine.NewContext(r)
 	out := json.NewEncoder(w)
 	response := &utils.ApiResponse{}
-	usr, err := NewUserFromFormData(r)
+	//	usr, err := NewUserFromFormData(r)
+	usr, err := NewUserFromFormBody(r)
 	if UserCredentialsAreUnique(usr.Username, usr.Email, r) {
 		if err != nil {
 			ServerError(ServerExecutionError, UserErrorSave, response, out)

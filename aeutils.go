@@ -413,6 +413,31 @@ func NewUserFromFormData(r *http.Request) (*User, error) {
 	return nil, InvalidUserForm
 }
 
+func NewUserFromFormBody(r *http.Request) (*User, error) {
+	var tc map[string]interface{}
+
+	decoder := json.NewDecoder(r.Body)
+
+	err := decoder.Decode(&tc)
+	var firstName = tc["firstName"].(string)
+	var lastName = tc["lastName"].(string)
+	var username = tc["username"].(string)
+	var email = tc["email"].(string)
+	var password = tc["password"].(string)
+
+	if firstName != "" && lastName != "" && username != "" && email != "" && password != "" && err == nil {
+		user := &User{
+			Username:  username,
+			FirstName: firstName,
+			LastName:  lastName,
+			Email:     email,
+		}
+		return user, nil
+	}
+
+	return nil, InvalidUserForm
+}
+
 type test_struct struct {
 	Name      string
 	ImgURL    string
@@ -441,16 +466,25 @@ func NewRecipeCollectionFromFormBody(r *http.Request) (*map[string]interface{}, 
 	return &tc, nil
 }
 
-func NewRecipeFromFormBody(r *http.Request) (*test_struct, error) {
+func NewRecipeFromFormBody(r *http.Request) (*Recipe, error) {
+	var tc map[string]interface{}
 	decoder := json.NewDecoder(r.Body)
-	var t test_struct
-	err := decoder.Decode(&t)
-	if err != nil {
-		return nil, InvalidRecipeForm
-	}
-	log.Println("The Name is: " + t.Name)
+	err := decoder.Decode(&tc)
 
-	return &t, nil
+	var name = tc["name"].(string)
+	var imgUrl = tc["imgUrl"].(string)
+	var creatorID = tc["creatorID"].(string) //number
+	creatorIDNum, numErr := strconv.ParseInt(creatorID, 10, 64)
+
+	if name != "" && imgUrl != "" && creatorID != "" && err == nil && numErr == nil {
+		recipe := &Recipe{
+			Name:      name,
+			ImgUrl:    imgUrl,
+			CreatorID: creatorIDNum,
+		}
+		return recipe, nil
+	}
+	return nil, InvalidRecipeForm
 }
 
 func NewRecipeFromFormData(r *http.Request) (*Recipe, error) {
@@ -471,6 +505,26 @@ func NewRecipeFromFormData(r *http.Request) (*Recipe, error) {
 	//	return nil, errors.New("invalid form data: " + name + "\n" + imgUrl + "\n" + creatorID + numErr.Error())
 }
 
+func NewTagFromFormBody(r *http.Request) (*Tag, error) {
+	var tc map[string]interface{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&tc)
+
+	var name = tc["name"].(string)
+	//	var creatorID = tc["creatorID"].(int64)
+	var creatorID = tc["creatorID"].(string)
+	creatorIDNum, numErr := strconv.ParseInt(creatorID, 10, 64)
+
+	if name != "" && creatorID != "" && err == nil && numErr == nil {
+		tag := &Tag{
+			Name:      name,
+			CreatorID: creatorIDNum,
+		}
+		return tag, nil
+	}
+	return nil, InvalidTagForm
+}
+
 func NewTagFromFormData(r *http.Request) (*Tag, error) {
 	name := r.FormValue("name")
 	creatorID := r.FormValue("creatorID")
@@ -484,6 +538,29 @@ func NewTagFromFormData(r *http.Request) (*Tag, error) {
 		return tag, nil
 	}
 	return nil, InvalidTagForm
+}
+
+func NewRatingFromFormBody(r *http.Request) (*Rating, error) {
+	var tc map[string]interface{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&tc)
+
+	var rating = tc["rating"].(string)
+	ratingNum, numErr := strconv.Atoi(rating) // convert to int
+	var creatorID = tc["creatorID"].(string)
+	creatorIDNum, numErr2 := strconv.ParseInt(creatorID, 10, 64) // convert to int64
+	var recipeID = tc["recipeID"].(string)
+	recipeIDNum, numErr3 := strconv.ParseInt(recipeID, 10, 64)
+
+	if err == nil && numErr == nil && numErr2 == nil && numErr3 == nil {
+		rate := &Rating{
+			Rating:    ratingNum,
+			CreatorID: creatorIDNum,
+			RecipeID:  recipeIDNum,
+		}
+		return rate, nil
+	}
+	return nil, InvalidRatingForm
 }
 
 func NewRatingFromFormData(r *http.Request) (*Rating, error) {

@@ -81,31 +81,48 @@ func GetUserContent(w http.ResponseWriter, r *http.Request) {
 func SetRecipeTags(w http.ResponseWriter, r *http.Request) {
 	out := json.NewEncoder(w)
 	response := &utils.ApiResponse{}
-	ctx := newappengine.NewContext(r)
+	//	ctx := newappengine.NewContext(r)
 
+	var tc map[string]interface{}
 	decoder := json.NewDecoder(r.Body)
-	payload := map[string]interface{}{}
-	err := decoder.Decode(&payload)
+	err := decoder.Decode(&tc)
+
+	var tagIDs = tc["tagIDs"].([]int64)
 	if err != nil {
 		ServerError(ServerExecutionError, "failed to decode objects with error: "+err.Error(), response, out)
 	} else {
-		userID := payload["userID"]
-		recipeID := payload["recipeID"]
-		tagIDs := payload["tagIDS"]
-		recipes := []Recipe{}
-		if _, err := newdatastore.NewQuery("Recipe").Filter("CreatorID =", userID).Filter("ID =", recipeID).Limit(1).GetAll(ctx, &recipes); err != nil {
-			ServerError(ServerExecutionError, "unable to retrieve recipes", response, out)
-		} else {
-			recipe := &recipes[0]
-			recipe.TagIDs = tagIDs.([]int64)
-			if _, updateErr := newdatastore.Put(ctx, recipe.Key, recipe); updateErr != nil {
-				ServerError(ServerExecutionError, "unable to update entity", response, out)
-			} else {
-				ServerResponse(ServerExecutionSuccess, "successfully updated entity", recipe, response, out)
-			}
-		}
+		savedIDs := []int64{}
+		tagIdx := 0
+		for tagIdx < len(tagIDs) {
+			tagID := tagIDs[tagIdx]
 
+			savedIDs = append(savedIDs, tagID)
+			tagIdx++
+		}
 	}
+	/*	payload := map[string]interface{}{}
+		err := decoder.Decode(&payload)
+		if err != nil {
+			ServerError(ServerExecutionError, "failed to decode objects with error: "+err.Error(), response, out)
+		} else {
+			userID := payload["userID"]
+			recipeID := payload["recipeID"]
+			tagIDs := payload["tagIDS"]
+			recipes := []Recipe{}
+			if _, err := newdatastore.NewQuery("Recipe").Filter("CreatorID =", userID).Filter("ID =", recipeID).Limit(1).GetAll(ctx, &recipes); err != nil {
+				ServerError(ServerExecutionError, "unable to retrieve recipes", response, out)
+			} else {
+				recipe := &recipes[0]
+				recipe.TagIDs = tagIDs.([]int64)
+				if _, updateErr := newdatastore.Put(ctx, recipe.Key, recipe); updateErr != nil {
+					ServerError(ServerExecutionError, "unable to update entity", response, out)
+				} else {
+					ServerResponse(ServerExecutionSuccess, "successfully updated entity", recipe, response, out)
+				}
+			}
+
+		}
+	*/
 }
 
 /** Recipe Handlers **/
@@ -119,7 +136,7 @@ func RecipesHandler(w http.ResponseWriter, r *http.Request) {
 		if _, err := newdatastore.NewQuery("Recipe").GetAll(ctx, &recipes); err != nil {
 			ServerError(ServerExecutionError, "couldnt retrieve users from datastore", response, out)
 		} else {
-			ServerResponse(ServerExecutionSuccess, UserSuccessFetch, recipes, response, out)
+			ServerResponse(ServerExecutionSuccess, "Got Recipes Successfully", recipes, response, out)
 		}
 	} else {
 		recipe := make([]Recipe, 0, 1)
@@ -173,7 +190,7 @@ func TagsHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("id")
 	if id == "" {
 		if _, err := newdatastore.NewQuery("Tag").GetAll(ctx, &tags); err != nil {
-			ServerError(ServerExecutionError, "couldnt retrieve tags from datastore", response, out)
+			ServerError(ServerExecutionError, "couldnt retrieve tags from datastore: "+err.Error(), response, out)
 		} else {
 			ServerResponse(ServerExecutionSuccess, TagSuccessFetch, tags, response, out)
 		}
