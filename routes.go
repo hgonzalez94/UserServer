@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/agnivade/easy-scrypt"
 	"github.com/mrvdot/golang-utils"
 	newappengine "google.golang.org/appengine"
 	newdatastore "google.golang.org/appengine/datastore"
@@ -16,7 +17,24 @@ TODO: Abstract 'Model' Handlers to accept interface{} argument and return Model 
 
 /** Root Handler **/
 func RootHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "ready recipe")
+	passphrase := "testPass"
+	key, err := scrypt.DerivePassphrase(passphrase, 32)
+	if err != nil {
+		fmt.Fprintf(w, "fucked up deriving passphrase bro")
+	}
+
+	fmt.Fprintf(w, "key returned - %v\n", key)
+	var result bool
+
+	result, err = scrypt.VerifyPassphrase(passphrase, key)
+	if err != nil {
+		fmt.Fprintf(w, "couldnt verify password")
+	}
+	if !result {
+		fmt.Fprintf(w, "couldnt verify password pt2: the mixtape")
+	} else {
+		fmt.Fprintf(w, "passphrase successfully verified")
+	}
 }
 
 /** User Handlers **/
@@ -195,18 +213,14 @@ func TagsHandler(w http.ResponseWriter, r *http.Request) {
 			ServerResponse(ServerExecutionSuccess, TagSuccessFetch, tags, response, out)
 		}
 	} else {
-		tag := make([]Tag, 0, 1)
+		tag := []Tag{}
 		num, numErr := strconv.Atoi(id)
-		if _, err := newdatastore.NewQuery("Tag").Filter("ID =", num).Limit(1).GetAll(ctx, &tag); err != nil || numErr != nil {
+		if _, err := newdatastore.NewQuery("Tag").Filter("CreatorID =", num).GetAll(ctx, &tag); err != nil || numErr != nil {
 			ServerError(ServerExecutionError, fmt.Sprintf("couldnt retrieve tag with id: %s \nError: %s", id, err.Error()), response, out)
 		} else {
 			if len(tag) > 0 {
-				if usr, uErr := GetCreatorFromTag(&tag[0], r); uErr != nil {
-					ServerError(ServerExecutionError, fmt.Sprintf("couldnt retrieve tag with id: %s \nError: %s", id, err.Error()), response, out)
-				} else {
-					result := map[string]interface{}{"creator": usr, "tag": tag[0]}
-					ServerResponse(ServerExecutionSuccess, fmt.Sprintf("retrieved tag with id: %s", id), result, response, out)
-				}
+				result := map[string]interface{}{"tag": tag}
+				ServerResponse(ServerExecutionSuccess, fmt.Sprintf("retrieved tag with id: %s", id), result, response, out)
 			}
 		}
 	}
