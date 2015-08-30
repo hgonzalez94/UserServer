@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/clbanning/x2j"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
 	"github.com/gorilla/sessions"
@@ -10,6 +11,7 @@ import (
 	"github.com/mrvdot/golang-utils"
 	"golang.org/x/net/context"
 	newappengine "google.golang.org/appengine"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -108,6 +110,9 @@ func init() {
 	router.HandleFunc("/users/current.json", VerificationHandler).
 		Methods("POST", "GET").
 		Name("VerifyEntry")
+	router.HandleFunc("/users/login.json", LoginHandler).
+		Methods("POST", "GET").
+		Name("LoginEntry")
 
 	router.HandleFunc("/accounts.json", AccountsHandler)
 	// Recipes
@@ -132,6 +137,7 @@ func init() {
 	// API
 	router.HandleFunc("/usercontent.json", GetUserContent)
 	router.HandleFunc("/setrecipetags.json", SetRecipeTags)
+	router.HandleFunc("/readxml.json", ReadXml)
 
 	// Hook-up router to go http package
 	http.Handle("/", router)
@@ -140,6 +146,15 @@ func init() {
 /**
 Api Func
 */
+
+func ReadXml(w http.ResponseWriter, r *http.Request) {
+	buff, err := ioutil.ReadFile("TestStoryboard.storyboard")
+	if err == nil {
+		s := string(buff)
+		m, _ := x2j.DocToMap(s)
+		fmt.Fprintf(w, "map: "+x2j.WriteMap(m))
+	}
+}
 
 func VerificationHandler(w http.ResponseWriter, r *http.Request) {
 	out := json.NewEncoder(w)

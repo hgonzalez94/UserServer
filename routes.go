@@ -38,6 +38,42 @@ func RootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 /** User Handlers **/
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	out := json.NewEncoder(w)
+	response := &utils.ApiResponse{}
+	ctx := newappengine.NewContext(r)
+
+	var tc map[string]interface{}
+	decoder := json.NewDecoder(r.Body)
+
+	errd := decoder.Decode(&tc)
+	var email = tc["email"].(string)
+	var password = tc["password"].(string)
+	if errd == nil && email != "" && password != "" {
+		user := make([]User, 0, 1)
+		if _, err := newdatastore.NewQuery("User").Filter("Email =", email).Limit(1).GetAll(ctx, &user); err != nil {
+			ServerError(ServerExecutionError, fmt.Sprintf("couldnt retrieve user with email: %v", email), response, out)
+		} else {
+			if len(user) > 0 { //fetched the nigge
+				var result bool
+				result, err = scrypt.VerifyPassphrase(password, user[0].EncryptedPassword)
+				if err != nil {
+					ServerError(ServerExecutionError, "couldnt authenticate user error 1", response, out)
+				}
+				if !result {
+					ServerError(ServerExecutionError, "couldnt authenticate user error 2", response, out)
+				} else {
+					res := map[string]interface{}{"user": user[0]}
+					ServerResponse(ServerExecutionSuccess, fmt.Sprintf("successful login"), res, response, out)
+				}
+			} else { //suck a dick
+				ServerError(ServerExecutionError, "couldnt authenticate user error 3", response, out)
+			}
+		}
+	} else {
+		ServerError(ServerExecutionError, "wrong shit submitted holmes", response, out)
+	}
+}
 func UsersHandler(w http.ResponseWriter, r *http.Request) {
 	out := json.NewEncoder(w)
 	response := &utils.ApiResponse{}

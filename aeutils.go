@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/agnivade/easy-scrypt"
 	"github.com/mrvdot/golang-utils"
 	"github.com/qedus/nds"
 
@@ -399,13 +400,15 @@ func NewUserFromFormData(r *http.Request) (*User, error) {
 	username := r.FormValue("username")
 	email := r.FormValue("email")
 	password := r.FormValue("password")
+	encryptedPass, err := scrypt.DerivePassphrase(password, 32)
 
-	if firstName != "" && lastName != "" && username != "" && email != "" && password != "" {
+	if firstName != "" && lastName != "" && username != "" && email != "" && password != "" && err == nil {
 		user := &User{
-			Username:  username,
-			FirstName: firstName,
-			LastName:  lastName,
-			Email:     email,
+			Username:          username,
+			FirstName:         firstName,
+			LastName:          lastName,
+			Email:             email,
+			EncryptedPassword: encryptedPass,
 		}
 		return user, nil
 	}
@@ -425,14 +428,21 @@ func NewUserFromFormBody(r *http.Request) (*User, error) {
 	var email = tc["email"].(string)
 	var password = tc["password"].(string)
 
-	if firstName != "" && lastName != "" && username != "" && email != "" && password != "" && err == nil {
-		user := &User{
-			Username:  username,
-			FirstName: firstName,
-			LastName:  lastName,
-			Email:     email,
+	passkey, err := scrypt.DerivePassphrase(password, 32)
+	if err != nil {
+		return nil, InvalidUserForm
+	} else {
+		if firstName != "" && lastName != "" && username != "" && email != "" && password != "" && err == nil {
+			user := &User{
+				Username:          username,
+				FirstName:         firstName,
+				LastName:          lastName,
+				Email:             email,
+				EncryptedPassword: passkey,
+			}
+			log.Println("about to return created user")
+			return user, nil
 		}
-		return user, nil
 	}
 
 	return nil, InvalidUserForm
